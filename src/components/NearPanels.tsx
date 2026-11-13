@@ -18,7 +18,7 @@ const short = (id: string) => (id.length > 26 ? `${id.slice(0, 12)}…${id.slice
 
 function Ext({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="font-mono text-ink underline decoration-ink/35 underline-offset-2 hover:text-pepper">
+    <a href={href} target="_blank" rel="noreferrer" className="font-mono underline decoration-current/40 underline-offset-2 hover:text-pepper">
       {children}
     </a>
   );
@@ -55,8 +55,12 @@ function useWalletAction() {
 function StatusAlerts({ error, info }: { error: string | null; info: string | null }) {
   return (
     <>
-      {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</p>}
-      {info && <p className="rounded-xl border border-leaf/25 bg-mint px-3 py-2 text-xs text-leaf">{info}</p>}
+      {error && (
+        <p className="rounded-lg border border-red-400/40 bg-red-950/50 px-3 py-2 text-xs text-red-200">{error}</p>
+      )}
+      {info && (
+        <p className="rounded-lg border border-radar/40 bg-radar/15 px-3 py-2 text-xs text-mint">{info}</p>
+      )}
     </>
   );
 }
@@ -117,13 +121,14 @@ export function NearProjectBanner({ view }: { view: ClientView }) {
     );
 
   return (
-    <section className="space-y-3 border-b border-line pb-6">
+    <section className="space-y-2.5 border-b border-line pb-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="label">
-            {view.project.siteCity}, {view.project.siteState} · Built from {view.project.ownerCity}
+            PLOT IB-04 · {view.project.siteCity}, {view.project.siteState} (7.4370° N, 3.9470° E) · Built from{" "}
+            {view.project.ownerCity}
           </p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">{view.project.name}</h1>
+          <h1 className="mt-1.5 text-3xl font-black tracking-tight sm:text-4xl">{view.project.name}</h1>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -138,7 +143,7 @@ export function NearProjectBanner({ view }: { view: ClientView }) {
             </button>
           ) : null}
           {chain ? (
-            <span className="rounded-full bg-mint px-3 py-1.5 font-mono text-xs font-semibold text-leaf">
+            <span className="rounded-lg border border-leaf/30 bg-mint px-3 py-1.5 font-mono text-xs font-semibold text-leaf">
               Live on NEAR {config.network}
             </span>
           ) : null}
@@ -166,9 +171,14 @@ export function NearProjectBanner({ view }: { view: ClientView }) {
       </div>
 
       {near.readError && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{near.readError}</p>
+        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">{near.readError}</p>
       )}
-      <StatusAlerts error={error} info={info} />
+      {(error || info) && (
+        <div>
+          {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</p>}
+          {info && <p className="rounded-lg border border-leaf/25 bg-mint px-3 py-2 text-xs text-leaf">{info}</p>}
+        </div>
+      )}
     </section>
   );
 }
@@ -180,6 +190,47 @@ const CHAIN_STATUS_TEXT: Record<ChainStageStatus, string> = {
   released: "Paid out to contractor",
   refunded: "Refunded to owner",
 };
+
+function SealEmblem({ kind }: { kind: "usdc" | "tee" | "key" }) {
+  return (
+    <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-dashed border-[#536c8a] bg-[#0b1623] font-mono text-sm font-bold text-[#c9d6e5] ring-1 ring-[#2a415d] ring-offset-2 ring-offset-[#16263b]">
+      {kind === "usdc" ? "$" : kind === "tee" ? "N" : "⚷"}
+    </span>
+  );
+}
+
+function SealRow({
+  kind,
+  done,
+  title,
+  detail,
+}: {
+  kind: "usdc" | "tee" | "key";
+  done: boolean;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-blueprint-line bg-blueprint-card/75 px-4 py-3">
+      <div className="flex items-center gap-3.5">
+        <SealEmblem kind={kind} />
+        <div>
+          <p className="font-mono text-xs font-semibold tracking-wide text-[#f4f0e8]">{title}</p>
+          <p className="mt-0.5 text-xs text-[#9db0c7]">{detail}</p>
+        </div>
+      </div>
+      <span
+        className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+          done
+            ? "bg-radar text-blueprint"
+            : "border border-blueprint-line bg-[#0b1623] text-[#6d829c]"
+        }`}
+      >
+        {done ? "✓" : "·"}
+      </span>
+    </div>
+  );
+}
 
 export function NearStageEscrow({ view, stage }: { view: ClientView; stage: ClientStage }) {
   const router = useRouter();
@@ -198,24 +249,36 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
 
   if (stage.status === "paid" && stage.nearStageIndex == null) {
     return (
-      <section className="card space-y-5">
+      <section className="card-blueprint space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="label">Escrow & Owner Locks</p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            <p className="font-mono text-[10px] tracking-[0.14em] text-[#8ea1b8] uppercase">
+              Three-Seal Engineering Stamp Vault
+            </p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#f4f0e8]">
               {String(stage.seq).padStart(2, "0")}. {stage.name}
             </h2>
           </div>
-          <span className="rounded-full bg-mint px-3 py-1 font-mono text-xs font-semibold text-leaf">
-            Settled
+          <span className="rounded-md bg-radar/20 px-2.5 py-1 font-mono text-xs font-semibold text-mint">
+            SETTLED
           </span>
         </div>
 
-        <p className="text-sm text-muted">{stage.description}</p>
+        <p className="text-sm text-[#a7b7ca]">{stage.description}</p>
 
-        <div className="space-y-2.5 rounded-2xl border border-line bg-paper p-4 text-xs">
-          <LockRow done={true} label="Completed & paid before on-chain rollout" detail={`${formatUsdc(stageUsdcRaw)} · ${formatNgn(stage.laborTrancheNgn)}`} />
-          <LockRow done={true} label="Contract schedule begins at next open stage" detail="Select Stage 03 (Blockwork to lintel) for live NEAR escrow" />
+        <div className="space-y-2.5">
+          <SealRow
+            kind="usdc"
+            done={true}
+            title="SEAL 01 · COMPLETED BEFORE ON-CHAIN ROLLOUT"
+            detail={`${formatUsdc(stageUsdcRaw)} · ${formatNgn(stage.laborTrancheNgn)}`}
+          />
+          <SealRow
+            kind="tee"
+            done={true}
+            title="SEAL 02 · NEXT ACTIVE CONTRACT MILESTONE"
+            detail="Select Stage 03 (Blockwork to lintel) for live NEAR escrow"
+          />
         </div>
       </section>
     );
@@ -223,26 +286,49 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
 
   if (stage.nearStageIndex == null || !chain || !near.nearProjectId) {
     return (
-      <section className="card space-y-5">
+      <section className="card-blueprint space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="label">Escrow & Owner Locks</p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight">
+            <p className="font-mono text-[10px] tracking-[0.14em] text-[#8ea1b8] uppercase">
+              Three-Seal Engineering Stamp Vault
+            </p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#f4f0e8]">
               {String(stage.seq).padStart(2, "0")}. {stage.name}
             </h2>
           </div>
-          <span className="rounded-full bg-paper px-3 py-1 font-mono text-xs font-medium ring-1 ring-line">
+          <span className="rounded-md border border-blueprint-line bg-blueprint-card px-2.5 py-1 font-mono text-xs font-medium text-[#f4f0e8]">
             {formatUsdc(stageUsdcRaw)} · {formatNgn(stage.laborTrancheNgn)}
           </span>
         </div>
 
-        <p className="text-sm text-muted">{stage.description}</p>
+        <p className="text-sm text-[#a7b7ca]">{stage.description}</p>
 
-        <div className="space-y-2.5 rounded-2xl border border-line bg-paper p-4 text-xs">
-          <LockRow done={false} label="Lock 1 · Register & fund USDC on NEAR" detail="Connect wallet and click 'Put project on NEAR' first" />
-          <LockRow done={false} label="Lock 2 · NEAR AI Cloud TEE photo verdict" detail="Submit or test a site photo on Foreman Site (/site)" />
-          <LockRow done={false} label="Lock 3 · Owner 1 yoctoNEAR approval" detail="Unlocks after Locks 1 & 2 pass" />
+        <div className="space-y-2.5">
+          <SealRow
+            kind="usdc"
+            done={false}
+            title="SEAL 01 · CIRCLE USDC ESCROWED"
+            detail="Connect wallet and click 'Put project on NEAR' first"
+          />
+          <SealRow
+            kind="tee"
+            done={false}
+            title="SEAL 02 · NEAR AI CLOUD TEE VERDICT"
+            detail="Submit or test a site photo on Foreman Studio (/site)"
+          />
+          <SealRow
+            kind="key"
+            done={false}
+            title="SEAL 03 · OWNER 1 YOCTONEAR KEY"
+            detail="Ready for signature after Seals 01 & 02 clear"
+          />
         </div>
+
+        {!wallet.accountId && (
+          <button type="button" onClick={() => void wallet.connect()} className="btn-pop w-full py-3.5 text-sm">
+            Connect wallet to deploy &amp; escrow
+          </button>
+        )}
       </section>
     );
   }
@@ -311,70 +397,73 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
     });
 
   return (
-    <section className="card space-y-5">
+    <section className="card-blueprint space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="label">Escrow & Owner Locks</p>
-          <h2 className="mt-1 text-2xl font-bold tracking-tight">
+          <p className="font-mono text-[10px] tracking-[0.14em] text-[#8ea1b8] uppercase">
+            Three-Seal Engineering Stamp Vault
+          </p>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#f4f0e8]">
             {String(stage.seq).padStart(2, "0")}. {stage.name}
           </h2>
-          <p className="mt-1 text-xs text-muted">{CHAIN_STATUS_TEXT[cs.status]}</p>
+          <p className="mt-1 text-xs text-[#9db0c7]">{CHAIN_STATUS_TEXT[cs.status]}</p>
         </div>
-        <span className="rounded-full bg-paper px-3 py-1 font-mono text-xs font-medium ring-1 ring-line">
+        <span className="rounded-md border border-blueprint-line bg-blueprint-card px-2.5 py-1 font-mono text-xs font-medium text-[#f4f0e8]">
           {formatUsdc(cs.funded)} / {formatUsdc(cs.amount)}
         </span>
       </div>
 
-      <p className="text-sm text-muted">{stage.description}</p>
-
-      <div className="space-y-2.5 rounded-2xl border border-line bg-paper p-4 text-xs">
-        <LockRow
+      <div className="space-y-2.5">
+        <SealRow
+          kind="usdc"
           done={BigInt(cs.funded) >= BigInt(cs.amount) || cs.status === "released"}
-          label="Lock 1 · USDC escrowed on contract"
-          detail={`Payee locked to ${short(cs.payee)}`}
+          title="SEAL 01 · CIRCLE USDC ESCROWED"
+          detail={`${formatUsdc(cs.amount)} locked for ${short(cs.payee)}`}
         />
-        <LockRow
+        <SealRow
+          kind="tee"
           done={Boolean(cs.verdict && cs.verdict.verdict === "pass")}
-          label="Lock 2 · NEAR AI TEE verdict on chain"
+          title="SEAL 02 · NEAR AI CLOUD TEE VERDICT"
           detail={
             cs.verdict
               ? `${cs.verdict.verdict.toUpperCase()} (${cs.verdict.confidence}%) · Ed25519 verified`
-              : "Awaiting passing photo from Foreman Site (/site)"
+              : "Awaiting passing photo from Foreman Studio (/site)"
           }
         />
-        <LockRow
+        <SealRow
+          kind="key"
           done={cs.status === "released"}
-          label="Lock 3 · Owner 1 yoctoNEAR wallet approval"
+          title="SEAL 03 · OWNER 1 YOCTONEAR KEY"
           detail={
             cs.status === "released"
               ? "Approved & paid to contractor"
               : cs.status === "proposed"
-                ? "Unlocked! Waiting for owner wallet"
-                : "Locked until Locks 1 & 2 clear"
+                ? "Unlocked! Ready for owner signature"
+                : "Locked until Seals 01 & 02 clear"
           }
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex flex-col gap-2.5">
         {!wallet.accountId ? (
-          <button type="button" onClick={() => void wallet.connect()} className="btn px-4 py-2 text-xs">
-            Connect NEAR wallet
+          <button type="button" onClick={() => void wallet.connect()} className="btn-pop w-full py-3.5 text-sm">
+            Connect NEAR wallet to sign
           </button>
         ) : (
           <>
             {canFund && (
-              <button type="button" disabled={pending || !isOwner} onClick={fundStage} className="btn-pop px-5 py-2.5 text-xs">
-                {pending ? "Signing…" : `Fund ${formatUsdc(needed.toString())}`}
+              <button type="button" disabled={pending || !isOwner} onClick={fundStage} className="btn-pop w-full py-3.5 text-sm">
+                {pending ? "Signing…" : `Fund ${formatUsdc(needed.toString())} USDC`}
               </button>
             )}
             {canRetryPropose && (
-              <button type="button" disabled={proposePending} onClick={retryPropose} className="btn px-5 py-2.5 text-xs">
+              <button type="button" disabled={proposePending} onClick={retryPropose} className="btn w-full border border-blueprint-line bg-blueprint-card py-3 text-xs text-white">
                 {proposePending ? "Proposing…" : "Submit AI release proposal"}
               </button>
             )}
             {cs.status === "proposed" && (
-              <button type="button" disabled={pending || !isOwner} onClick={approveRelease} className="btn-pop px-5 py-2.5 text-xs">
-                {pending ? "Signing 1 yoctoNEAR…" : `Approve & pay ${formatUsdc(cs.amount)}`}
+              <button type="button" disabled={pending || !isOwner} onClick={approveRelease} className="btn-pop w-full py-3.5 text-sm">
+                {pending ? "Signing 1 yoctoNEAR…" : `Sign & Release ${formatUsdc(cs.amount)}`}
               </button>
             )}
           </>
@@ -382,15 +471,17 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
       </div>
 
       {wallet.accountId && !isOwner && cs.status !== "released" && cs.status !== "refunded" && (
-        <p className="text-xs text-muted">
-          Signed in as <span className="font-mono text-ink">{short(wallet.accountId)}</span>. Only owner{" "}
-          <span className="font-mono text-ink">{short(chain.owner)}</span> can fund, approve, override, or refund.
+        <p className="text-xs text-[#9db0c7]">
+          Signed in as <span className="font-mono text-white">{short(wallet.accountId)}</span>. Only owner{" "}
+          <span className="font-mono text-white">{short(chain.owner)}</span> can fund, approve, override, or refund.
         </p>
       )}
 
       {isOwner && (cs.status === "funded" || cs.status === "proposed") && (
-        <details className="rounded-2xl border border-line bg-paper/70 px-4 py-3 text-xs">
-          <summary className="cursor-pointer font-medium text-ink">Owner escape controls (override / refund)</summary>
+        <details className="rounded-xl border border-blueprint-line bg-blueprint-card/60 px-4 py-3 text-xs">
+          <summary className="cursor-pointer font-mono text-[11px] font-medium text-[#d2dce8]">
+            Owner escape controls (override / refund)
+          </summary>
           <div className="mt-3 space-y-3">
             {cs.status === "funded" && (
               <div className="flex flex-wrap gap-2">
@@ -398,20 +489,25 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
                   value={overrideReason}
                   onChange={(e) => setOverrideReason(e.target.value)}
                   placeholder="Reason to override AI block"
-                  className="field min-w-[180px] flex-1 py-2 text-xs"
+                  className="min-w-[180px] flex-1 rounded-lg border border-blueprint-line bg-[#09111c] px-3 py-2 text-xs text-white placeholder:text-[#6f839c]"
                 />
                 <button
                   type="button"
                   disabled={pending || overrideReason.trim().length < 4}
                   onClick={overrideRelease}
-                  className="btn-ghost px-3 py-2 text-xs"
+                  className="btn border border-blueprint-line bg-blueprint px-3 py-2 text-xs"
                 >
-                  Override & pay
+                  Override &amp; pay
                 </button>
               </div>
             )}
             {BigInt(cs.funded) > 0n && (
-              <button type="button" disabled={pending} onClick={refundStage} className="btn-ghost px-3 py-2 text-xs text-red-700 ring-red-300">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={refundStage}
+                className="btn border border-red-400/40 bg-red-950/40 px-3 py-2 text-xs text-red-200 hover:bg-red-900/50"
+              >
                 Refund {formatUsdc(cs.funded)} to owner
               </button>
             )}
@@ -420,7 +516,7 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
       )}
 
       {matchingEv?.chainVerdict?.submitTx && (
-        <p className="font-mono text-[11px] text-muted">
+        <p className="font-mono text-[11px] text-[#9db0c7]">
           Verdict tx: <Ext href={txUrl(config, matchingEv.chainVerdict.submitTx)}>{short(matchingEv.chainVerdict.submitTx)}</Ext>
           {matchingEv.chainVerdict.proposeTx && (
             <>
@@ -432,13 +528,13 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
       )}
 
       {stageTxs.length > 0 && (
-        <ul className="space-y-1 border-t border-dashed border-line pt-3 text-xs">
+        <ul className="space-y-1 border-t border-dashed border-blueprint-line pt-3 text-xs text-[#d2dce8]">
           {stageTxs.map((p) => (
             <li key={p.id} className="flex items-center justify-between gap-2">
               <Ext href={txUrl(config, p.nearTxHash as string)}>
                 {p.direction === "in" ? (p.status === "refunded" ? "Funded (refunded)" : "USDC funded") : `Paid ${p.payeeName ?? "contractor"}`}
               </Ext>
-              <span className="font-mono text-[11px] text-muted">
+              <span className="font-mono text-[11px] text-[#8ea1b8]">
                 {new Date(p.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
               </span>
             </li>
@@ -448,24 +544,6 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
 
       <StatusAlerts error={error ?? proposeMsg.err} info={info ?? proposeMsg.ok} />
     </section>
-  );
-}
-
-function LockRow({ done, label, detail }: { done: boolean; label: string; detail: string }) {
-  return (
-    <div className="flex items-start gap-2.5">
-      <span
-        className={`mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-          done ? "bg-mint text-leaf" : "bg-card text-muted ring-1 ring-line"
-        }`}
-      >
-        {done ? "✓" : "·"}
-      </span>
-      <div>
-        <span className="font-medium text-ink">{label}</span>
-        <span className="block text-[11px] text-muted">{detail}</span>
-      </div>
-    </div>
   );
 }
 
@@ -496,11 +574,13 @@ export function AttestationCard({
   };
 
   return (
-    <section className="card space-y-4">
+    <section className="card-blueprint space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="label">NEAR AI Cloud · Confidential TEE</p>
-          <h2 className="mt-1 text-xl font-bold tracking-tight">{model}</h2>
+          <p className="font-mono text-[10px] tracking-[0.14em] text-[#8ea1b8] uppercase">
+            NEAR AI Cloud · Confidential TEE
+          </p>
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-[#f4f0e8]">{model}</h2>
         </div>
         <button type="button" disabled={loading} onClick={() => void checkLive()} className="btn-pop px-4 py-2 text-xs">
           {loading ? "Checking TDX + GPU…" : "Verify live TEE attestation"}
@@ -508,24 +588,27 @@ export function AttestationCard({
       </div>
 
       {registeredSigner && (
-        <div className="rounded-2xl border border-line bg-paper p-3 font-mono text-[11px] text-muted">
+        <div className="rounded-lg border border-blueprint-line bg-blueprint-card/75 p-3 font-mono text-[11px] text-[#9db0c7]">
           <span className="block text-[10px] uppercase tracking-wider">On-chain contract signer</span>
-          <span className="mt-1 block break-all text-ink">{registeredSigner}</span>
+          <span className="mt-1 block break-all text-[#f4f0e8]">{registeredSigner}</span>
         </div>
       )}
 
-      {err && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">{err}</p>}
+      {err && <p className="rounded-lg bg-red-950/60 px-3 py-2 text-xs text-red-200">{err}</p>}
 
       {report && (
-        <div className="space-y-1.5 rounded-2xl border border-line bg-paper p-3 font-mono text-[11px]">
+        <div className="space-y-1.5 rounded-lg border border-blueprint-line bg-[#09111c] p-3 font-mono text-[11px]">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-semibold text-ink">Intel TDX · {report.tcbStatus}</span>
-            <span className={`rounded-full px-2 py-0.5 ${report.matchesOnChain ? "bg-mint text-leaf" : "bg-amber-50 text-amber-800"}`}>
+            <span className="font-semibold text-[#f4f0e8]">Intel TDX · {report.tcbStatus}</span>
+            <span className={`rounded px-2 py-0.5 ${report.matchesOnChain ? "bg-radar/20 text-mint" : "bg-pepper/20 text-pepper"}`}>
               {report.matchesOnChain ? "Matches on-chain signer" : "Attested"}
             </span>
           </div>
-          <p className="break-all text-muted">Signing key: {report.signingAddress}</p>
-          <p className="text-muted">GPU NRAS: {report.gpuVerified ? "Verified" : "TDX quote verified"} · Checked {new Date(report.verifiedAt).toLocaleTimeString("en-GB")}</p>
+          <p className="break-all text-[#9db0c7]">Signing key: {report.signingAddress}</p>
+          <p className="text-[#9db0c7]">
+            GPU NRAS: {report.gpuVerified ? "Verified" : "TDX quote verified"} · Checked{" "}
+            {new Date(report.verifiedAt).toLocaleTimeString("en-GB")}
+          </p>
         </div>
       )}
     </section>

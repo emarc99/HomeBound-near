@@ -1,14 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  --color-paper: #f6f2e9;
-  --color-card: #fffcf5;
-  --color-ink: #111111;
-  --color-muted: #5f584e;
-  --color-line: #e2d8c6;
-  --color-pepper: #ff4a1c;
-  --color-leaf: #067a45;
-  --color-mint: #d6f5e3;
+  --color-paper: #eae5dc;
+  --color-card: #f4f0e8;
+  --color-blueprint: #0f1d2d;
+  --color-blueprint-card: #16263b;
+  --color-blueprint-line: #263b54;
+  --color-ink: #0f1d2d;
+  --color-muted: #55606e;
+  --color-line: #cdc5b4;
+  --color-pepper: #d4882a;
+  --color-leaf: #0d8a5a;
+  --color-radar: #10b981;
+  --color-mint: #d1fae5;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -20,23 +24,27 @@ body {
 
 ::selection {
   background: var(--color-pepper);
-  color: var(--color-ink);
+  color: var(--color-blueprint);
 }
 
 @utility btn {
-  @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-ink px-5 py-3 text-sm font-semibold text-paper transition hover:-translate-y-0.5 active:translate-y-0 disabled:pointer-events-none disabled:opacity-40;
+  @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-ink px-5 py-3 text-xs font-semibold tracking-wider text-paper uppercase transition hover:bg-blueprint-card active:translate-y-px disabled:pointer-events-none disabled:opacity-40;
 }
 
 @utility btn-pop {
-  @apply btn bg-pepper text-ink shadow-[3px_3px_0_var(--color-ink)];
+  @apply btn bg-pepper text-blueprint font-bold shadow-[0_2px_0_rgba(15,29,45,0.45)] hover:brightness-105;
 }
 
 @utility btn-ghost {
-  @apply btn bg-transparent text-ink ring-1 ring-ink/20 hover:ring-ink;
+  @apply btn bg-card text-ink ring-1 ring-line hover:ring-ink;
 }
 
 @utility card {
-  @apply rounded-3xl border border-line bg-card p-6;
+  @apply rounded-xl border border-line bg-card p-6;
+}
+
+@utility card-blueprint {
+  @apply rounded-xl border border-blueprint-line bg-blueprint p-6 text-[#f4f0e8] shadow-md;
 }
 
 @utility label {
@@ -44,5 +52,5 @@ body {
 }
 
 @utility field {
-  @apply w-full rounded-2xl border border-line bg-paper px-4 py-3 text-base outline-none placeholder:text-muted/70 focus:border-ink;
+  @apply w-full rounded-lg border border-line bg-paper px-4 py-2.5 text-sm outline-none placeholder:text-muted/70 focus:border-ink;
 }

@@ -11,15 +11,13 @@ import {
   uploadStagePhotoAction,
   type PhotoSubmissionResult,
 } from "@/app/actions/evidence";
+import { GeofenceRadar } from "./GeofenceRadar";
 import { StagePipeline } from "./StagePipeline";
 
-const VERDICT_PILL: Record<"pass" | "fail" | "needs_review", { label: string; cls: string }> = {
-  pass: { label: "AI Verdict · PASS", cls: "bg-mint text-leaf" },
-  fail: { label: "AI Verdict · FAIL", cls: "bg-red-100 text-red-800" },
-  needs_review: { label: "Needs review", cls: "bg-amber-50 text-amber-800 border border-amber-200" },
-};
+type SiteViewTab = "viewfinder" | "radar";
 
-const shortHex = (h: string) => (h.length > 22 ? `${h.slice(0, 10)}…${h.slice(-8)}` : h);
+const shortHex = (h: string) => (h.length > 26 ? `${h.slice(0, 12)}…${h.slice(-8)}` : h);
+const RULER_TICKS = ["0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100", "110", "120"];
 
 export function SiteStudio({
   view,
@@ -40,6 +38,7 @@ export function SiteStudio({
   const selectedStage = view.stages.find((s) => s.id === selectedId) ?? view.stages[0];
   const [file, setFile] = useState<File | null>(null);
   const [activeSample, setActiveSample] = useState<SamplePhotoKey | null>(null);
+  const [tab, setTab] = useState<SiteViewTab>("viewfinder");
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
@@ -103,21 +102,19 @@ export function SiteStudio({
     latest?.verdict?.extracted && typeof latest.verdict.extracted.camera === "string"
       ? latest.verdict.extracted.camera
       : null;
+  const verdict = latest?.verdict ?? null;
+  const confidencePct = verdict ? Math.round(verdict.confidence * 100) : null;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 pt-4 pb-16">
-      <section className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-6">
+      <section className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
         <div>
           <p className="label">
-            Field inspection · {view.project.siteCity}, {view.project.siteState} (7.4370°N, 3.9470°E · 150m radius)
+            Foreman Field Inspection · {view.project.siteCity}, {view.project.siteState} (7.4370° N, 3.9470° E · 150m Geofence)
           </p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Submit site progress proof.</h1>
-          <p className="mt-3 max-w-2xl text-base text-muted">
-            Foremen upload a live camera photo — or judges can click a real EXIF-stamped field sample below to watch
-            NEAR AI Cloud&apos;s TEE grade and sign the verdict.
-          </p>
+          <h1 className="mt-1.5 text-3xl font-black tracking-tight sm:text-4xl">Submit site progress proof.</h1>
         </div>
-        <Link href="/build" className="btn-ghost px-5 py-2.5 text-xs">
+        <Link href="/build" className="btn-ghost px-4 py-2 text-xs">
           Owner Escrow (/build) →
         </Link>
       </section>
@@ -137,18 +134,19 @@ export function SiteStudio({
 
       {selectedStage && (
         <div className="grid items-start gap-6 lg:grid-cols-2">
+          {/* Left Sheet: Vellum Field Camera & 1-Click EXIF Samples */}
           <section className="card space-y-5">
             <div>
-              <p className="label">Stage {String(selectedStage.seq).padStart(2, "0")} Camera Studio</p>
+              <p className="label">Stage {String(selectedStage.seq).padStart(2, "0")} Field Dispatch</p>
               <h2 className="mt-1 text-2xl font-bold tracking-tight">{selectedStage.name}</h2>
-              <p className="mt-2 rounded-2xl border border-line bg-paper px-3.5 py-2.5 text-xs text-muted">
-                <strong className="text-ink">Done when:</strong> {selectedStage.acceptanceCriteria}
+              <p className="mt-2 rounded-lg border border-line bg-paper px-3.5 py-2.5 text-xs text-muted">
+                <strong className="text-ink">Acceptance criteria:</strong> {selectedStage.acceptanceCriteria}
               </p>
             </div>
 
             {selectedStage.status === "paid" ? (
-              <p className="rounded-xl bg-mint px-3 py-2 text-xs font-medium text-leaf">
-                This stage is already paid. Select Stage 03 or later above to run live TEE inspections.
+              <p className="rounded-lg border border-leaf/30 bg-mint px-3 py-2 text-xs font-medium text-leaf">
+                This stage is already settled. Select Stage 03 or later above to run live TEE inspections.
               </p>
             ) : (
               <>
@@ -165,7 +163,7 @@ export function SiteStudio({
                             type="button"
                             disabled={pending}
                             onClick={() => triggerSample(key)}
-                            className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-line bg-paper text-left transition hover:-translate-y-0.5 hover:border-ink disabled:pointer-events-none disabled:opacity-50"
+                            className="group flex cursor-pointer flex-col overflow-hidden rounded-lg border border-line bg-paper text-left transition hover:-translate-y-0.5 hover:border-ink disabled:pointer-events-none disabled:opacity-50"
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
@@ -179,8 +177,8 @@ export function SiteStudio({
                                   {isRunning ? "Inspecting in TEE…" : sample.label}
                                 </span>
                                 <span
-                                  className={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-medium ${
-                                    isPass ? "bg-mint text-leaf" : "bg-amber-50 text-amber-800"
+                                  className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
+                                    isPass ? "bg-mint text-leaf" : "bg-amber-100 text-amber-900"
                                   }`}
                                 >
                                   {sample.tag}
@@ -204,7 +202,7 @@ export function SiteStudio({
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     onChange={(ev) => setFile(ev.target.files?.[0] ?? null)}
-                    className="block w-full text-xs text-muted file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-ink file:px-4 file:py-2 file:text-xs file:font-semibold file:text-paper hover:file:opacity-90"
+                    className="block w-full text-xs text-muted file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-ink file:px-4 file:py-2 file:text-xs file:font-semibold file:text-paper hover:file:opacity-90"
                   />
                   <button type="submit" disabled={pending || !file} className="btn-pop self-start px-5 py-2.5 text-xs">
                     {pending && !activeSample ? "Inspecting in NEAR AI TEE…" : "Run TEE photo check"}
@@ -213,92 +211,154 @@ export function SiteStudio({
               </>
             )}
 
-            {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</p>}
+            {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</p>}
             {statusNote && (
-              <p className="rounded-xl border border-leaf/25 bg-mint px-3 py-2 text-xs text-leaf">{statusNote}</p>
+              <p className="rounded-lg border border-leaf/25 bg-mint px-3 py-2 text-xs text-leaf">{statusNote}</p>
             )}
           </section>
 
-          <section className="card space-y-5">
-            <div className="flex flex-wrap items-start justify-between gap-2">
+          {/* Right Card: Prussian CAD Viewfinder + Plot Geofence Radar Tab */}
+          <section className="card-blueprint space-y-4 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blueprint-line pb-3">
               <div>
-                <p className="label">Live 5-Gate Inspection</p>
-                <h2 className="mt-1 text-2xl font-bold tracking-tight">TEE verdict &amp; evidence</h2>
+                <p className="font-mono text-[10px] tracking-[0.14em] text-[#8ea1b8] uppercase">
+                  Live 5-Gate TEE Verification
+                </p>
+                <h2 className="mt-0.5 text-lg font-bold tracking-tight text-[#f4f0e8]">
+                  {tab === "viewfinder" ? "CAD Inspection & TEE Receipt" : "Plot IB-04 Geofence Radar"}
+                </h2>
               </div>
-              {latest?.verdict && (
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${VERDICT_PILL[latest.verdict.verdict].cls}`}>
-                  {VERDICT_PILL[latest.verdict.verdict].label} · {Math.round(latest.verdict.confidence * 100)}%
-                </span>
-              )}
+
+              <div className="inline-flex rounded-lg border border-blueprint-line bg-[#09111c] p-0.5 font-mono text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setTab("viewfinder")}
+                  className={`cursor-pointer rounded-md px-3 py-1.5 transition ${
+                    tab === "viewfinder" ? "bg-pepper font-bold text-blueprint" : "text-[#9cb0c7] hover:text-white"
+                  }`}
+                >
+                  CAD Viewfinder
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("radar")}
+                  className={`cursor-pointer rounded-md px-3 py-1.5 transition ${
+                    tab === "radar" ? "bg-radar font-bold text-blueprint" : "text-[#9cb0c7] hover:text-white"
+                  }`}
+                >
+                  Geofence Radar
+                </button>
+              </div>
             </div>
 
-            {latest ? (
-              <div className="space-y-4">
+            {tab === "radar" ? (
+              <GeofenceRadar
+                photoLat={latest?.lat}
+                photoLng={latest?.lng}
+                photoLabel={latest ? `Stage ${String(selectedStage.seq).padStart(2, "0")} upload` : undefined}
+                takenAt={latest?.takenAt}
+              />
+            ) : latest ? (
+              <div className="space-y-3.5">
+                <div className="flex justify-between px-1 font-mono text-[9px] text-[#7c90a8]">
+                  {RULER_TICKS.map((t) => (
+                    <span key={t}>{t}</span>
+                  ))}
+                </div>
+
                 {latest.blobKey && (
-                  <div className="overflow-hidden rounded-2xl border border-line bg-paper">
+                  <div className="relative overflow-hidden rounded-lg border border-blueprint-line bg-[#09111c]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`/api/blobs/${encodeURIComponent(latest.blobKey)}`}
                       alt={`Inspected photo for ${selectedStage.name}`}
-                      className="h-52 w-full object-cover"
+                      className="h-56 w-full object-cover"
                     />
+                    <div className="pointer-events-none absolute inset-3 border border-white/20">
+                      <span className="absolute -top-px -left-px size-3 border-t-2 border-l-2 border-white/80" />
+                      <span className="absolute -top-px -right-px size-3 border-t-2 border-r-2 border-white/80" />
+                      <span className="absolute -bottom-px -left-px size-3 border-b-2 border-l-2 border-white/80" />
+                      <span className="absolute -right-px -bottom-px size-3 border-r-2 border-b-2 border-white/80" />
+                    </div>
+                    <div className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap justify-between gap-2">
+                      {latest.lat != null && latest.lng != null && (
+                        <span className="rounded bg-[#09111c]/85 px-2 py-1 font-mono text-[10px] text-[#f4f0e8]">
+                          {latest.lat.toFixed(4)}° N, {latest.lng.toFixed(4)}° E
+                        </span>
+                      )}
+                      {latest.takenAt && (
+                        <span className="rounded bg-[#09111c]/85 px-2 py-1 font-mono text-[10px] text-[#f4f0e8]">
+                          {new Date(latest.takenAt).toISOString().slice(0, 16).replace("T", " ")} UTC
+                        </span>
+                      )}
+                    </div>
+                    <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap justify-between gap-2">
+                      <span className="rounded bg-[#09111c]/85 px-2 py-1 font-mono text-[10px] text-[#c7d3e3]">
+                        SHA-256: {shortHex(latest.chainVerdict?.responseHash ?? latest.blobKey ?? latest.id)}
+                      </span>
+                      {verdict && (
+                        <span
+                          className={`rounded px-2.5 py-1 font-mono text-[10px] font-bold tracking-wider uppercase ${
+                            verdict.verdict === "pass"
+                              ? "bg-radar text-blueprint"
+                              : verdict.verdict === "fail"
+                                ? "bg-red-500 text-white"
+                                : "bg-pepper text-blueprint"
+                          }`}
+                        >
+                          {confidencePct}% CONFIDENCE · {verdict.verdict}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                {(cameraLabel || latest.lat != null || latest.takenAt) && (
-                  <div className="flex flex-wrap gap-2 font-mono text-[11px] text-muted">
-                    {cameraLabel && (
-                      <span className="rounded-full border border-line bg-paper px-2.5 py-0.5 text-ink">
-                        Camera: {cameraLabel}
-                      </span>
-                    )}
-                    {latest.lat != null && latest.lng != null && (
-                      <span className="rounded-full border border-line bg-paper px-2.5 py-0.5">
-                        GPS: {latest.lat.toFixed(4)}°N, {latest.lng.toFixed(4)}°E
-                      </span>
-                    )}
-                    {latest.takenAt && (
-                      <span className="rounded-full border border-line bg-paper px-2.5 py-0.5">
-                        Captured: {new Date(latest.takenAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                      </span>
-                    )}
-                  </div>
+                <div className="flex justify-between px-1 font-mono text-[9px] text-[#7c90a8]">
+                  {RULER_TICKS.map((t) => (
+                    <span key={t}>{t}</span>
+                  ))}
+                </div>
+
+                {cameraLabel && (
+                  <p className="font-mono text-[11px] text-[#9cb0c7]">
+                    EXIF Device: <span className="text-[#f4f0e8]">{cameraLabel}</span>
+                  </p>
                 )}
 
-                {latest.verdict && (
+                {verdict && (
                   <>
-                    {latest.verdict.observations.length > 0 && (
-                      <ul className="space-y-1.5 text-xs text-muted">
-                        {latest.verdict.observations.map((obs, i) => (
+                    {verdict.observations.length > 0 && (
+                      <ul className="space-y-1 text-xs text-[#c7d3e3]">
+                        {verdict.observations.map((obs, i) => (
                           <li key={i} className="flex gap-2">
-                            <span className="text-pepper">•</span>
+                            <span className="text-pepper">›</span>
                             <span>{obs}</span>
                           </li>
                         ))}
                       </ul>
                     )}
 
-                    <div className="space-y-2">
-                      {latest.verdict.checks.map((c) => (
+                    <div className="space-y-1.5">
+                      {verdict.checks.map((c) => (
                         <div
                           key={c.name}
-                          className="rounded-xl border border-line bg-paper px-3.5 py-2.5 text-xs"
+                          className="rounded-lg border border-blueprint-line bg-blueprint-card/75 px-3.5 py-2 text-xs"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-semibold text-ink">{c.name}</span>
+                            <span className="font-semibold text-[#f4f0e8]">{c.name}</span>
                             <span
-                              className={`font-mono text-[11px] font-medium ${
+                              className={`font-mono text-[10px] font-bold uppercase ${
                                 c.status === "pass"
-                                  ? "text-leaf"
+                                  ? "text-radar"
                                   : c.status === "fail"
-                                    ? "text-red-700"
-                                    : "text-amber-700"
+                                    ? "text-red-400"
+                                    : "text-pepper"
                               }`}
                             >
                               {c.status}
                             </span>
                           </div>
-                          <p className="mt-1 text-[11px] text-muted">{c.detail}</p>
+                          <p className="mt-0.5 text-[11px] text-[#9db0c7]">{c.detail}</p>
                         </div>
                       ))}
                     </div>
@@ -306,26 +366,26 @@ export function SiteStudio({
                 )}
 
                 {latest.chainVerdict && (
-                  <div className="space-y-1 rounded-2xl border border-line bg-paper p-3 font-mono text-[11px] text-muted">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-ink">
+                  <div className="space-y-1 rounded-lg border border-blueprint-line bg-[#09111c] p-3 font-mono text-[11px] text-[#9cb0c7]">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[#f4f0e8]">
                       <span className="font-semibold">TEE Ed25519 Receipt ({latest.chainVerdict.modelId})</span>
                       {latest.chainVerdict.submitTx ? (
                         <a
                           href={txUrl(view.near.config, latest.chainVerdict.submitTx)}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-leaf underline"
+                          className="text-radar underline"
                         >
                           Verified on NEAR ↗
                         </a>
                       ) : (
-                        <span className="text-amber-700">Saved locally</span>
+                        <span className="text-pepper">Saved locally</span>
                       )}
                     </div>
                     <p>Request hash: {shortHex(latest.chainVerdict.requestHash)}</p>
                     <p>Response hash: {shortHex(latest.chainVerdict.responseHash)}</p>
                     <p>Signature: {shortHex(latest.chainVerdict.signature)}</p>
-                    {latest.chainVerdict.error && <p className="text-amber-800">{latest.chainVerdict.error}</p>}
+                    {latest.chainVerdict.error && <p className="text-pepper">{latest.chainVerdict.error}</p>}
                   </div>
                 )}
 
@@ -334,9 +394,9 @@ export function SiteStudio({
                 </Link>
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-line bg-paper p-6 text-center text-xs text-muted">
-                Pick one of the 4 EXIF-stamped field samples on the left or upload a site photo to watch all 5 checks
-                and NEAR AI Cloud&apos;s TEE signature run live.
+              <div className="rounded-lg border border-dashed border-blueprint-line bg-[#09111c] p-8 text-center text-xs text-[#9db0c7]">
+                Click one of the 4 EXIF-stamped field samples on the left or upload a site photo to watch all 5 checks
+                and NEAR AI Cloud&apos;s TEE signature execute — then switch to <strong className="text-mint">Geofence Radar</strong> to inspect the plot pin.
               </div>
             )}
           </section>
