@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "contract:test": "cargo test --manifest-path contracts/escrow/Cargo.toml --lib",
-    "spike:nearai": "node scripts/nearai-spike.mjs"
+    "spike:nearai": "node scripts/nearai-spike.mjs",
+    "attack": "node scripts/attack.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.15",
