@@ -170,15 +170,11 @@ export async function verifyModelAttestationLive(onChainSigner: string | null): 
   const model = nearAiModel();
   const { AttestationClient, verifyModelAttestation } = await import("@nearai/inference-sdk");
   const client = new AttestationClient({ baseUrl: BASE, apiKey });
-  const fetched = (await client.fetchModelAttestations({ model, signingAlgo: "ed25519" })) as {
-    attestations?: unknown[];
-    modelAttestations?: unknown[];
-    nonce?: string;
-    clientBinding?: { nonce?: string };
-  };
-  const list = fetched.attestations ?? fetched.modelAttestations ?? [];
-  const nonce = fetched.nonce ?? fetched.clientBinding?.nonce;
+  const fetched = await client.fetchModelAttestations({ model, signingAlgo: "ed25519" });
+  const list = fetched.attestations;
+  const nonce = fetched.clientBinding.nonce;
   if (!list.length) throw new NearAiError(`No attestation candidates returned for ${model}`);
+  if (!nonce) throw new NearAiError(`Attestation response missing clientBinding.nonce for ${model}`);
 
   const verified: Record<string, unknown>[] = [];
   let lastErr: unknown = null;
@@ -200,9 +196,9 @@ export async function verifyModelAttestationLive(onChainSigner: string | null): 
     for (const attestation of list) {
       try {
         const v = (await verifyModelAttestation({
-          attestation: attestation as never,
-          clientBinding: nonce ? { nonce } : undefined,
-        })) as Record<string, unknown>;
+          attestation,
+          clientBinding: { nonce },
+        })) as unknown as Record<string, unknown>;
         verified.push(v);
       } catch (err) {
         lastErr = err;
