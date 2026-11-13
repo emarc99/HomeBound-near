@@ -133,8 +133,8 @@ export function NearProjectBanner({ view }: { view: ClientView }) {
             </button>
           ) : null}
           {!near.nearProjectId && !wallet.accountId ? (
-            <button type="button" disabled={!wallet.ready} onClick={() => void wallet.connect()} className="btn-pop px-5 py-2.5 text-xs">
-              {wallet.ready ? "Connect wallet to deploy" : "Loading wallet…"}
+            <button type="button" onClick={() => void wallet.connect()} className="btn-pop px-5 py-2.5 text-xs">
+              Connect wallet to deploy
             </button>
           ) : null}
           {chain ? (
@@ -240,7 +240,7 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
 
         <div className="space-y-2.5 rounded-2xl border border-line bg-paper p-4 text-xs">
           <LockRow done={false} label="Lock 1 · Register & fund USDC on NEAR" detail="Connect wallet and click 'Put project on NEAR' first" />
-          <LockRow done={false} label="Lock 2 · NEAR AI Cloud TEE photo verdict" detail="You can still test photo inspection on the right" />
+          <LockRow done={false} label="Lock 2 · NEAR AI Cloud TEE photo verdict" detail="Submit or test a site photo on Foreman Site (/site)" />
           <LockRow done={false} label="Lock 3 · Owner 1 yoctoNEAR approval" detail="Unlocks after Locks 1 & 2 pass" />
         </div>
       </section>
@@ -339,7 +339,7 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
           detail={
             cs.verdict
               ? `${cs.verdict.verdict.toUpperCase()} (${cs.verdict.confidence}%) · Ed25519 verified`
-              : "Upload a contractor photo -> right card"
+              : "Awaiting passing photo from Foreman Site (/site)"
           }
         />
         <LockRow
@@ -357,8 +357,8 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
 
       <div className="flex flex-wrap items-center gap-2.5">
         {!wallet.accountId ? (
-          <button type="button" disabled={!wallet.ready} onClick={() => void wallet.connect()} className="btn px-4 py-2 text-xs">
-            {wallet.ready ? "Connect NEAR wallet" : "Loading wallet…"}
+          <button type="button" onClick={() => void wallet.connect()} className="btn px-4 py-2 text-xs">
+            Connect NEAR wallet
           </button>
         ) : (
           <>
