@@ -11,14 +11,17 @@ export function Logo() {
 
 export function Header({ wallet = true }: { wallet?: boolean }) {
   return (
-    <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
+    <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-5">
       <Logo />
-      <nav className="flex items-center gap-2 text-sm font-medium">
-        <Link href="/build" className="hidden rounded-full px-4 py-2 hover:bg-ink/5 sm:block">
-          Workspace
+      <nav className="flex items-center gap-1.5 text-xs font-medium sm:gap-2 sm:text-sm">
+        <Link href="/build" className="rounded-full px-3 py-1.5 hover:bg-ink/5 sm:px-4 sm:py-2">
+          Owner Escrow
         </Link>
-        <Link href="/#locks" className="hidden rounded-full px-4 py-2 hover:bg-ink/5 sm:block">
-          Three Locks
+        <Link href="/site" className="rounded-full px-3 py-1.5 hover:bg-ink/5 sm:px-4 sm:py-2">
+          Foreman Site
+        </Link>
+        <Link href="/verify" className="hidden rounded-full px-4 py-2 hover:bg-ink/5 md:block">
+          TEE &amp; Ledger
         </Link>
         {wallet && <ConnectButton />}
       </nav>

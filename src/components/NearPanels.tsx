@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ClientStage, ClientView } from "@/lib/client-view";
 import type { AttestationReport } from "@/lib/ai/nearai";
+import { formatNgn } from "@/lib/money";
 import { accountUrl, formatUsdc, ONE_YOCTO, txUrl, usdcForCents, type ChainStageStatus } from "@/lib/near/shared";
 import {
   nearProjectPlanAction,
@@ -116,17 +117,13 @@ export function NearProjectBanner({ view }: { view: ClientView }) {
     );
 
   return (
-    <section className="card space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <section className="space-y-3 border-b border-line pb-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="label">
             {view.project.siteCity}, {view.project.siteState} · Built from {view.project.ownerCity}
           </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{view.project.name}</h1>
-          <p className="mt-1 text-sm text-muted">
-            Contract <Ext href={accountUrl(config, config.escrow)}>{config.escrow}</Ext> · Agent{" "}
-            <Ext href={accountUrl(config, chain?.agent ?? config.agent)}>{short(chain?.agent ?? config.agent)}</Ext> (propose-only key)
-          </p>
+          <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">{view.project.name}</h1>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -148,18 +145,24 @@ export function NearProjectBanner({ view }: { view: ClientView }) {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Metric label="Total milestone pool" value={formatUsdc(totalRaw.toString())} sub={`Demo scale 1:${config.demoDivisor.toLocaleString()}`} />
-        <Metric label="Locked in escrow" value={formatUsdc(escrowedRaw.toString())} sub={chain ? `Owner ${short(chain.owner)}` : "Awaiting create_project"} />
-        <Metric
-          label="Released to contractor"
-          value={formatUsdc(releasedRaw.toString())}
-          sub={
-            near.contractorAccount
-              ? `${short(near.contractorAccount)} · ${near.contractorUsdc != null ? `${formatUsdc(near.contractorUsdc)} bal` : "…"}`
-              : "No contractor set"
-          }
-        />
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-xs text-muted">
+        <span>
+          Pool <strong className="text-ink">{formatUsdc(totalRaw.toString())}</strong>
+        </span>
+        <span>
+          Escrowed <strong className="text-ink">{formatUsdc(escrowedRaw.toString())}</strong>
+        </span>
+        <span>
+          Paid <strong className="text-ink">{formatUsdc(releasedRaw.toString())}</strong>
+        </span>
+        <span>
+          Contract <Ext href={accountUrl(config, config.escrow)}>{config.escrow}</Ext>
+        </span>
+        {near.contractorAccount && (
+          <span>
+            Payee <Ext href={accountUrl(config, near.contractorAccount)}>{short(near.contractorAccount)}</Ext>
+          </span>
+        )}
       </div>
 
       {near.readError && (
@@ -167,16 +170,6 @@ export function NearProjectBanner({ view }: { view: ClientView }) {
       )}
       <StatusAlerts error={error} info={info} />
     </section>
-  );
-}
-
-function Metric({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <div className="rounded-2xl border border-line bg-paper p-4">
-      <p className="label">{label}</p>
-      <p className="mt-2 font-mono text-2xl font-bold tracking-tight text-ink">{value}</p>
-      <p className="mt-1 font-mono text-[11px] text-muted">{sub}</p>
-    </div>
   );
 }
 
@@ -198,16 +191,58 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
   const [proposeMsg, setProposeMsg] = useState<{ err: string | null; ok: string | null }>({ err: null, ok: null });
   const [overrideReason, setOverrideReason] = useState("");
 
+  const stageUsdcRaw =
+    stage.nearStageIndex != null && chain
+      ? chain.stages[stage.nearStageIndex].amount
+      : usdcForCents(stage.laborTrancheUsdCents, config.demoDivisor).toString();
+
+  if (stage.status === "paid" && stage.nearStageIndex == null) {
+    return (
+      <section className="card space-y-5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="label">Escrow & Owner Locks</p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight">
+              {String(stage.seq).padStart(2, "0")}. {stage.name}
+            </h2>
+          </div>
+          <span className="rounded-full bg-mint px-3 py-1 font-mono text-xs font-semibold text-leaf">
+            Settled
+          </span>
+        </div>
+
+        <p className="text-sm text-muted">{stage.description}</p>
+
+        <div className="space-y-2.5 rounded-2xl border border-line bg-paper p-4 text-xs">
+          <LockRow done={true} label="Completed & paid before on-chain rollout" detail={`${formatUsdc(stageUsdcRaw)} · ${formatNgn(stage.laborTrancheNgn)}`} />
+          <LockRow done={true} label="Contract schedule begins at next open stage" detail="Select Stage 03 (Blockwork to lintel) for live NEAR escrow" />
+        </div>
+      </section>
+    );
+  }
+
   if (stage.nearStageIndex == null || !chain || !near.nearProjectId) {
     return (
-      <section className="card space-y-3">
-        <p className="label">02 · Escrow & Owner Locks</p>
-        <h2 className="text-xl font-bold tracking-tight">Stage {stage.seq}: {stage.name}</h2>
-        <p className="text-sm text-muted">
-          {near.nearProjectId
-            ? "This stage settled before on-chain creation."
-            : "Click 'Put project on NEAR' above to register all 6 stages, amounts, and contractor payees on chain before funding USDC."}
-        </p>
+      <section className="card space-y-5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="label">Escrow & Owner Locks</p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight">
+              {String(stage.seq).padStart(2, "0")}. {stage.name}
+            </h2>
+          </div>
+          <span className="rounded-full bg-paper px-3 py-1 font-mono text-xs font-medium ring-1 ring-line">
+            {formatUsdc(stageUsdcRaw)} · {formatNgn(stage.laborTrancheNgn)}
+          </span>
+        </div>
+
+        <p className="text-sm text-muted">{stage.description}</p>
+
+        <div className="space-y-2.5 rounded-2xl border border-line bg-paper p-4 text-xs">
+          <LockRow done={false} label="Lock 1 · Register & fund USDC on NEAR" detail="Connect wallet and click 'Put project on NEAR' first" />
+          <LockRow done={false} label="Lock 2 · NEAR AI Cloud TEE photo verdict" detail="You can still test photo inspection on the right" />
+          <LockRow done={false} label="Lock 3 · Owner 1 yoctoNEAR approval" detail="Unlocks after Locks 1 & 2 pass" />
+        </div>
       </section>
     );
   }
@@ -279,8 +314,8 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
     <section className="card space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="label">02 · Escrow & Owner Locks</p>
-          <h2 className="mt-1 text-xl font-bold tracking-tight">
+          <p className="label">Escrow & Owner Locks</p>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight">
             {String(stage.seq).padStart(2, "0")}. {stage.name}
           </h2>
           <p className="mt-1 text-xs text-muted">{CHAIN_STATUS_TEXT[cs.status]}</p>
@@ -290,7 +325,9 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
         </span>
       </div>
 
-      <div className="space-y-2 rounded-2xl border border-line bg-paper p-4 text-xs">
+      <p className="text-sm text-muted">{stage.description}</p>
+
+      <div className="space-y-2.5 rounded-2xl border border-line bg-paper p-4 text-xs">
         <LockRow
           done={BigInt(cs.funded) >= BigInt(cs.amount) || cs.status === "released"}
           label="Lock 1 · USDC escrowed on contract"
@@ -302,7 +339,7 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
           detail={
             cs.verdict
               ? `${cs.verdict.verdict.toUpperCase()} (${cs.verdict.confidence}%) · Ed25519 verified`
-              : "Upload a contractor photo -> right panel"
+              : "Upload a contractor photo -> right card"
           }
         />
         <LockRow
@@ -326,17 +363,17 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
         ) : (
           <>
             {canFund && (
-              <button type="button" disabled={pending || !isOwner} onClick={fundStage} className="btn-pop px-4 py-2.5 text-xs">
+              <button type="button" disabled={pending || !isOwner} onClick={fundStage} className="btn-pop px-5 py-2.5 text-xs">
                 {pending ? "Signing…" : `Fund ${formatUsdc(needed.toString())}`}
               </button>
             )}
             {canRetryPropose && (
-              <button type="button" disabled={proposePending} onClick={retryPropose} className="btn px-4 py-2.5 text-xs">
+              <button type="button" disabled={proposePending} onClick={retryPropose} className="btn px-5 py-2.5 text-xs">
                 {proposePending ? "Proposing…" : "Submit AI release proposal"}
               </button>
             )}
             {cs.status === "proposed" && (
-              <button type="button" disabled={pending || !isOwner} onClick={approveRelease} className="btn-pop px-4 py-2.5 text-xs">
+              <button type="button" disabled={pending || !isOwner} onClick={approveRelease} className="btn-pop px-5 py-2.5 text-xs">
                 {pending ? "Signing 1 yoctoNEAR…" : `Approve & pay ${formatUsdc(cs.amount)}`}
               </button>
             )}
@@ -459,21 +496,22 @@ export function AttestationCard({
   };
 
   return (
-    <section className="card space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <section className="card space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="label">NEAR AI Cloud · Confidential TEE</p>
-          <p className="mt-1 font-mono text-xs text-ink">{model}</p>
+          <h2 className="mt-1 text-xl font-bold tracking-tight">{model}</h2>
         </div>
-        <button type="button" disabled={loading} onClick={() => void checkLive()} className="btn-ghost px-3.5 py-2 text-xs">
+        <button type="button" disabled={loading} onClick={() => void checkLive()} className="btn-pop px-4 py-2 text-xs">
           {loading ? "Checking TDX + GPU…" : "Verify live TEE attestation"}
         </button>
       </div>
 
       {registeredSigner && (
-        <p className="font-mono text-[11px] text-muted break-all">
-          Contract registered signer: <span className="text-ink">{registeredSigner}</span>
-        </p>
+        <div className="rounded-2xl border border-line bg-paper p-3 font-mono text-[11px] text-muted">
+          <span className="block text-[10px] uppercase tracking-wider">On-chain contract signer</span>
+          <span className="mt-1 block break-all text-ink">{registeredSigner}</span>
+        </div>
       )}
 
       {err && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">{err}</p>}
@@ -483,10 +521,10 @@ export function AttestationCard({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="font-semibold text-ink">Intel TDX · {report.tcbStatus}</span>
             <span className={`rounded-full px-2 py-0.5 ${report.matchesOnChain ? "bg-mint text-leaf" : "bg-amber-50 text-amber-800"}`}>
-              {report.matchesOnChain ? "Matches on-chain signer" : "Attested (check signer key)"}
+              {report.matchesOnChain ? "Matches on-chain signer" : "Attested"}
             </span>
           </div>
-          <p className="text-muted break-all">Signing key: {report.signingAddress}</p>
+          <p className="break-all text-muted">Signing key: {report.signingAddress}</p>
           <p className="text-muted">GPU NRAS: {report.gpuVerified ? "Verified" : "TDX quote verified"} · Checked {new Date(report.verifiedAt).toLocaleTimeString("en-GB")}</p>
         </div>
       )}

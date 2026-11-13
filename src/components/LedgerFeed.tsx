@@ -40,7 +40,7 @@ export function LedgerFeed({
     <section className="card space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="label">04 · Hash-Chained Audit Trail</p>
+          <p className="label">Hash-Chained Audit Trail</p>
           <h2 className="mt-1 text-xl font-bold tracking-tight">Verification & payment ledger</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">

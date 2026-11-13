@@ -12,7 +12,7 @@ const steps = [
   {
     n: "02",
     title: "Verify inside a TEE",
-    body: "The contractor uploads a site photo. Checks inspect EXIF GPS, image hash, and stage criteria; NEAR AI Cloud signs the verdict inside an attested enclave.",
+    body: "The foreman uploads a site photo. Checks inspect EXIF GPS, image hash, and stage criteria; NEAR AI Cloud signs the verdict inside an attested enclave.",
   },
   {
     n: "03",
@@ -48,11 +48,11 @@ export default function Home() {
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Link href="/build" className="btn-pop px-7 py-4 text-base">
-                Open live workspace
+                Open owner escrow
               </Link>
-              <a href="#locks" className="btn-ghost px-7 py-4 text-base">
-                How the locks work
-              </a>
+              <Link href="/site" className="btn-ghost px-7 py-4 text-base">
+                Try foreman camera
+              </Link>
             </div>
           </div>
 
@@ -87,7 +87,7 @@ export default function Home() {
             <a href={accountUrl(cfg, cfg.escrow)} target="_blank" rel="noreferrer" className="text-paper underline">
               {cfg.escrow}
             </a>{" "}
-            · Red-team check via <span className="text-paper">npm run attack</span> &{" "}
+            · Red-team check via <span className="text-paper">npm run attack</span> &amp;{" "}
             <span className="text-paper">cargo test --lib</span>
           </p>
         </section>
@@ -97,7 +97,13 @@ export default function Home() {
         <span>Built for the NEAR Hackathon · runs on NEAR {cfg.network}</span>
         <div className="flex gap-5">
           <Link href="/build" className="hover:text-ink">
-            Workspace
+            Owner Escrow
+          </Link>
+          <Link href="/site" className="hover:text-ink">
+            Foreman Site
+          </Link>
+          <Link href="/verify" className="hover:text-ink">
+            TEE &amp; Ledger
           </Link>
           <a href="https://github.com/emarc99/HomeBound-near" target="_blank" rel="noreferrer" className="hover:text-ink">
             Source
@@ -114,18 +120,18 @@ function MilestonePreview({ escrowAccount }: { escrowAccount: string }) {
       <div className="absolute inset-0 translate-x-3 translate-y-3 rounded-3xl bg-pepper" />
       <div className="relative rounded-3xl border-2 border-ink bg-card p-7">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-bold">Stage 02 · Foundation & DPC</span>
+          <span className="font-bold">Stage 03 · Blockwork to lintel</span>
           <span className="rounded-full bg-mint px-3 py-1 text-xs font-semibold text-leaf">Passed</span>
         </div>
         <div className="mt-6 space-y-2 text-sm">
-          <Row a="EXIF & freshness" b="Enugu · Verified" />
+          <Row a="EXIF & freshness" b="Ibadan · Verified" />
           <Row a="Vision model" b="Qwen3.8-27B · Pass" />
         </div>
         <div className="mt-5 flex items-end justify-between border-t border-dashed border-line pt-5">
           <span className="label">Escrowed</span>
           <span className="text-right">
-            <span className="block text-3xl font-black tracking-tight">12.00 USDC</span>
-            <span className="font-mono text-xs text-muted">₦18,000,000 budget · 1:1000 demo</span>
+            <span className="block text-3xl font-black tracking-tight">1.50 USDC</span>
+            <span className="font-mono text-xs text-muted">₦2,325,000 budget · 1:1000 demo</span>
           </span>
         </div>
         <div className="mt-6 space-y-2 rounded-2xl bg-paper p-4 text-sm">

@@ -41,9 +41,9 @@ npm run build
 npm run dev
 ```
 
-Visit `http://localhost:3000` for the overview and `/build` for the 6-stage Enugu duplex workspace:
-- **Live TEE Attestation** — Click `Verify live TEE attestation` on `/build` (`GET /api/attestation`) to validate live Intel TDX + NVIDIA GPU TCB quotes via `@nearai/inference-sdk` against the on-chain `get_signer` key.
-- **Sample construction photos** — Sample site photos for testing uploads locally are available in `.data/fixtures/` (when present locally).
+Visit `http://localhost:3000` for the overview, `/build` for the homeowner escrow cockpit, `/site` for the foreman field camera + 1-click EXIF samples, and `/verify` for live enclave attestation & the audit ledger:
+- **Live TEE Attestation** — Click `Verify live TEE attestation` on `/verify` (`GET /api/attestation`) to validate live Intel TDX + NVIDIA GPU TCB quotes via `@nearai/inference-sdk` against the on-chain `get_signer` key.
+- **Sample construction photos** — Curated EXIF-stamped Ibadan and Lagos field photos are bundled in `public/samples/` for 1-click testing on `/site`.
 
 ---
 
