@@ -27,11 +27,17 @@ export async function nearProjectPlanAction(projectId: string): Promise<ActionRe
   }
 }
 
+function revalidateWorkspace() {
+  revalidatePath("/");
+  revalidatePath("/build");
+  revalidatePath("/site");
+  revalidatePath("/verify");
+}
+
 export async function proposeStageReleaseAction(stageId: string): Promise<ActionResult<{ txHash: string }>> {
   try {
     const txHash = await proposeStageRelease(stageId);
-    revalidatePath("/");
-    revalidatePath("/build");
+    revalidateWorkspace();
     return { ok: true, data: { txHash } };
   } catch (err) {
     return { ok: false, error: toError(err) };
@@ -50,8 +56,7 @@ export async function recordNearTxAction(kind: NearTxKind, id: string, txHash: s
     else if (kind === "release") await recordStageRelease(id, txHash, signerId);
     else if (kind === "refund") await recordStageRefund(id, txHash, signerId);
     else return { ok: false, error: "Unknown transaction kind" };
-    revalidatePath("/");
-    revalidatePath("/build");
+    revalidateWorkspace();
     return { ok: true };
   } catch (err) {
     return { ok: false, error: toError(err) };

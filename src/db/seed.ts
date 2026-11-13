@@ -1,8 +1,9 @@
 import "server-only";
 import { count, eq } from "drizzle-orm";
 import type { Db } from "./index";
-import { projects, parties, stages } from "./schema";
+import { projects, parties, payments, stages } from "./schema";
 import { appendLedger } from "@/lib/ledger";
+import { usdCentsToNgn } from "@/lib/money";
 
 const NGN_PER_USD = 1550;
 const DAY = 86_400_000;
@@ -89,7 +90,7 @@ export async function seed(db: Db): Promise<void> {
       siteLng: 3.947,
       siteRadiusM: 150,
       ngnPerUsd: NGN_PER_USD,
-      startDate: new Date("2026-10-05T08:00:00Z"),
+      startDate: new Date("2026-09-25T08:00:00Z"),
     })
     .returning();
 
@@ -110,7 +111,9 @@ export async function seed(db: Db): Promise<void> {
 
   let cursor = hero.startDate.getTime();
   let prevStageId: string | null = null;
+  const stageRows: (typeof stages.$inferSelect)[] = [];
   for (const [i, s] of HERO_STAGES.entries()) {
+    const status = i < 2 ? "paid" : "planned";
     const [row]: (typeof stages.$inferSelect)[] = await db
       .insert(stages)
       .values({
@@ -123,13 +126,44 @@ export async function seed(db: Db): Promise<void> {
         laborTrancheUsdCents: s.laborUsd * 100,
         dependsOnStageId: prevStageId,
         contractorId: contractor.id,
-        status: "planned",
+        status,
         acceptanceCriteria: s.criteria,
       })
       .returning();
+    stageRows.push(row);
     prevStageId = row.id;
     cursor += s.days * DAY;
   }
+
+  const prePaidPayments: (typeof payments.$inferInsert)[] = [];
+  for (const [i, s] of stageRows.slice(0, 2).entries()) {
+    const ngn = usdCentsToNgn(s.laborTrancheUsdCents, NGN_PER_USD);
+    prePaidPayments.push(
+      {
+        projectId: hero.id,
+        stageId: s.id,
+        kind: "funding",
+        direction: "in",
+        amountUsdCents: s.laborTrancheUsdCents,
+        amountNgn: ngn,
+        status: "completed",
+        idempotencyKey: `seed-fund-stage-${i + 1}`,
+      },
+      {
+        projectId: hero.id,
+        stageId: s.id,
+        kind: "labor",
+        direction: "out",
+        amountUsdCents: s.laborTrancheUsdCents,
+        amountNgn: ngn,
+        payeeId: contractor.id,
+        status: "completed",
+        idempotencyKey: `seed-labor-stage-${i + 1}`,
+        approvedBy: owner.name,
+      },
+    );
+  }
+  await db.insert(payments).values(prePaidPayments);
 
   await appendLedger(db, {
     projectId: hero.id,

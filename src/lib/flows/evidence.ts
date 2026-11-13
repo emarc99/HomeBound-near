@@ -49,8 +49,9 @@ export async function submitStagePhoto(input: { stageId: string; file: Buffer; u
       .select({ id: evidence.id, sha256: evidence.sha256, dhash: evidence.dhash, createdAt: evidence.createdAt, stageId: evidence.stageId, projectId: evidence.projectId })
       .from(evidence)
       .where(isNotNull(evidence.dhash));
-    const exact = prior.find((p) => p.sha256 === meta.sha256);
-    const near = exact ?? prior.find((p) => p.dhash && hammingDistance(p.dhash, meta.dhash) <= NEAR_DUPLICATE_BITS);
+    const otherStages = prior.filter((p) => p.stageId !== stage.id);
+    const exact = otherStages.find((p) => p.sha256 === meta.sha256);
+    const near = exact ?? otherStages.find((p) => p.dhash && hammingDistance(p.dhash, meta.dhash) <= NEAR_DUPLICATE_BITS);
     if (!near) return { name: CHECK.reuse, status: "pass", detail: "No earlier photo on Homebound looks like this one." };
     return {
       name: CHECK.reuse,
