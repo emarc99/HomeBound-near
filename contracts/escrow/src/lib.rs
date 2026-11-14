@@ -18,7 +18,10 @@ mod verdict;
 mod tests;
 
 pub use verdict::Verdict;
-use verdict::{expected_reference, from_hex, is_sha256_hex, parse_response, signed_text, to_hex};
+use verdict::{
+    expected_reference, expected_reference_with_criteria, from_hex, is_sha256_hex, parse_response,
+    signed_text, to_hex,
+};
 
 const PROPOSAL_TTL_NS: u64 = 7 * 24 * 60 * 60 * 1_000_000_000;
 const MIN_CONFIDENCE: u8 = 60;
@@ -367,10 +370,6 @@ impl Contract {
         );
 
         let parsed = parse_response(&response_body).unwrap_or_else(|e| env::panic_str(e));
-        require!(
-            parsed.reference == expected_reference(&project_id, stage, &evidence_sha256),
-            "The model's answer is for a different stage or photo"
-        );
 
         let now = env::block_timestamp();
         let project = self.project_mut(&project_id);
@@ -380,9 +379,32 @@ impl Contract {
         );
         let s = stage_mut(project, stage);
         require!(
-            matches!(s.status, StageStatus::Planned | StageStatus::Funded),
+            matches!(
+                s.status,
+                StageStatus::Planned | StageStatus::Funded | StageStatus::Proposed
+            ),
             "Stage is not open for a new verdict"
         );
+        let criteria_hash = s.criteria_hash.clone();
+        require!(
+            parsed.reference
+                == expected_reference_with_criteria(
+                    &project_id,
+                    stage,
+                    &criteria_hash,
+                    &evidence_sha256
+                )
+                || parsed.reference == expected_reference(&project_id, stage, &evidence_sha256),
+            "The model's answer is for a different stage or photo or criteria"
+        );
+        if s.status == StageStatus::Proposed
+            && (parsed.verdict != Verdict::Pass
+                || parsed.confidence < MIN_CONFIDENCE
+                || !checks.all_pass())
+        {
+            s.status = StageStatus::Funded;
+            s.proposal_expires_at = None;
+        }
         s.verdict = Some(VerdictRecord {
             evidence_sha256: evidence_sha256.clone(),
             model_id: model_id.clone(),
@@ -399,6 +421,7 @@ impl Contract {
             json!({
                 "project_id": project_id,
                 "stage": stage,
+                "criteria_hash": criteria_hash,
                 "verdict": parsed.verdict,
                 "confidence": parsed.confidence,
                 "checks": checks,
@@ -420,8 +443,8 @@ impl Contract {
         require_previous_released(project, stage);
         let s = stage_mut(project, stage);
         require!(
-            s.status == StageStatus::Funded,
-            "Stage must be fully funded and not yet proposed"
+            matches!(s.status, StageStatus::Funded | StageStatus::Proposed) && s.funded == s.amount,
+            "Stage must be fully funded and not yet released"
         );
         let v = s
             .verdict

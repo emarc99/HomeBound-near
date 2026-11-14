@@ -27,6 +27,16 @@ pub fn expected_reference(project_id: &str, stage: u32, evidence_sha256: &str) -
     format!("{project_id}/{stage}/{evidence_sha256}")
 }
 
+/// Criteria-bound reference pinning project, stage, SHA-256 acceptance criteria hash, and photo hash.
+pub fn expected_reference_with_criteria(
+    project_id: &str,
+    stage: u32,
+    criteria_hash: &str,
+    evidence_sha256: &str,
+) -> String {
+    format!("{project_id}/{stage}/{criteria_hash}/{evidence_sha256}")
+}
+
 /// Reads the verdict out of an OpenAI-style chat completion body.
 pub fn parse_response(body: &str) -> Result<ParsedVerdict, &'static str> {
     let response: Value = serde_json::from_str(body).map_err(|_| "Response body is not JSON")?;

@@ -464,3 +464,65 @@ fn only_the_admin_registers_signers() {
     call_1yocto(owner());
     c.register_signer("evil/model".into(), to_hex(&[1u8; 32]));
 }
+
+fn answer_with_criteria(verdict: &str, confidence: u32, stage: u32, criteria: &str) -> String {
+    let content = format!(
+        r#"{{"verdict":"{verdict}","confidence":{confidence},"ref":"{PROJECT}/{stage}/{criteria}/{EVIDENCE}"}}"#
+    );
+    json!({ "id": "chatcmpl-2", "choices": [{ "message": { "content": content } }] }).to_string()
+}
+
+#[test]
+fn a_verdict_bound_to_criteria_hash_is_verified_and_failed_recheck_resets_proposal() {
+    let mut c = setup();
+    fund(&mut c, 0, 5_000_000);
+    call(agent());
+
+    let pass_body = answer_with_criteria("pass", 93, 0, CRITERIA);
+    c.submit_verdict(
+        PROJECT.into(),
+        0,
+        EVIDENCE.into(),
+        MODEL.into(),
+        REQUEST.into(),
+        pass_body.clone(),
+        sign(&pass_body),
+        all_checks(),
+    );
+    c.propose_release(PROJECT.into(), 0);
+    assert_eq!(stage(&c, 0).status, StageStatus::Proposed);
+
+    let fail_body = answer_with_criteria("fail", 40, 0, CRITERIA);
+    c.submit_verdict(
+        PROJECT.into(),
+        0,
+        EVIDENCE.into(),
+        MODEL.into(),
+        REQUEST.into(),
+        fail_body.clone(),
+        sign(&fail_body),
+        all_checks(),
+    );
+    assert_eq!(stage(&c, 0).status, StageStatus::Funded);
+    assert!(stage(&c, 0).proposal_expires_at.is_none());
+}
+
+#[test]
+#[should_panic(expected = "different stage or photo")]
+fn a_verdict_for_wrong_criteria_hash_is_refused() {
+    let mut c = setup();
+    fund(&mut c, 0, 5_000_000);
+    call(agent());
+    let wrong_criteria = "9999999999999999999999999999999999999999999999999999999999999999";
+    let body = answer_with_criteria("pass", 95, 0, wrong_criteria);
+    c.submit_verdict(
+        PROJECT.into(),
+        0,
+        EVIDENCE.into(),
+        MODEL.into(),
+        REQUEST.into(),
+        body.clone(),
+        sign(&body),
+        all_checks(),
+    );
+}
