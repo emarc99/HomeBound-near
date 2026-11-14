@@ -1,7 +1,11 @@
 import "server-only";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import type { Db } from "./index";
 import { projects, parties, payments, stages } from "./schema";
+import {
+  COMPLETED_PORTFOLIO_PROJECTS,
+  HERO_PORTFOLIO_META,
+} from "./portfolio-seed-data";
 import { appendLedger } from "@/lib/ledger";
 import { usdCentsToNgn } from "@/lib/money";
 import type { ChainStageStatus } from "@/lib/near/shared";
@@ -67,7 +71,17 @@ const HERO_STAGES: StageSeed[] = [
 
 export async function syncContractorAccount(db: Db): Promise<void> {
   const acct = process.env.NEAR_CONTRACTOR_ACCOUNT;
-  if (acct) await db.update(parties).set({ nearAccountId: acct }).where(eq(parties.role, "contractor"));
+  if (!acct) return;
+  const [hero] = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(eq(projects.nearProjectId, "hb-akobo-bungalow-v2"))
+    .limit(1);
+  if (!hero) return;
+  await db
+    .update(parties)
+    .set({ nearAccountId: acct })
+    .where(and(eq(parties.projectId, hero.id), eq(parties.role, "contractor")));
 }
 
 export async function isSeeded(db: Db): Promise<boolean> {
@@ -256,13 +270,192 @@ export async function seed(db: Db): Promise<void> {
     projectId: hero.id,
     type: "near.stage_funded",
     actor: "tightrat3805.testnet (owner wallet)",
-    payload: {
-      nearProjectId: "hb-akobo-bungalow-v2",
-      stageSeq: 3,
-      stageName: stageThree?.name ?? "Blockwork to lintel",
-      usdcRaw: "1500000",
-      fullyFunded: true,
-      txHash: "PW1xrcYmz8LydDTc3eQ834tKhz7J1xBDkectu29bzPD",
-    },
-  });
+      payload: {
+        nearProjectId: "hb-akobo-bungalow-v2",
+        stageSeq: 3,
+        stageName: stageThree?.name ?? "Blockwork to lintel",
+        usdcRaw: "1500000",
+        fullyFunded: true,
+        txHash: "PW1xrcYmz8LydDTc3eQ834tKhz7J1xBDkectu29bzPD",
+      },
+    });
+}
+
+export async function ensurePortfolioSeeded(db: Db): Promise<void> {
+  // 1. Backfill portfolio metadata on the active hero project if missing
+  const [hero] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.nearProjectId, "hb-akobo-bungalow-v2"))
+    .limit(1);
+
+  if (hero && hero.slug !== HERO_PORTFOLIO_META.slug) {
+    await db
+      .update(projects)
+      .set({
+        slug: HERO_PORTFOLIO_META.slug,
+        code: HERO_PORTFOLIO_META.code,
+        typology: HERO_PORTFOLIO_META.typology,
+        completionStatus: HERO_PORTFOLIO_META.completionStatus,
+        completedYear: HERO_PORTFOLIO_META.completedYear,
+        areaSqm: HERO_PORTFOLIO_META.areaSqm,
+        durationWeeks: HERO_PORTFOLIO_META.durationWeeks,
+        layoutVariant: HERO_PORTFOLIO_META.layoutVariant,
+        heroImage: HERO_PORTFOLIO_META.heroImage,
+        sectionImage: HERO_PORTFOLIO_META.sectionImage,
+        detailImage: HERO_PORTFOLIO_META.detailImage,
+        summary: HERO_PORTFOLIO_META.summary,
+        architecturalBrief: HERO_PORTFOLIO_META.architecturalBrief,
+        spatialNotes: HERO_PORTFOLIO_META.spatialNotes,
+        structuralNotes: HERO_PORTFOLIO_META.structuralNotes,
+        specsJson: JSON.stringify(HERO_PORTFOLIO_META.specs),
+      })
+      .where(eq(projects.id, hero.id));
+  }
+
+  // 2. Idempotently insert each completed diaspora work and its settled escrow stages
+  for (const def of COMPLETED_PORTFOLIO_PROJECTS) {
+    const [existing] = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.slug, def.slug))
+      .limit(1);
+    if (existing) continue;
+
+    const startDate = new Date(def.startDateIso);
+    const [proj] = await db
+      .insert(projects)
+      .values({
+        name: def.name,
+        ownerName: def.ownerName,
+        ownerCity: def.ownerCity,
+        ownerCountry: def.ownerCountry,
+        siteCity: def.siteCity,
+        siteState: def.siteState,
+        siteLat: def.siteLat,
+        siteLng: def.siteLng,
+        siteRadiusM: def.siteRadiusM,
+        ngnPerUsd: def.ngnPerUsd,
+        startDate,
+        nearProjectId: def.nearProjectId,
+        slug: def.slug,
+        code: def.code,
+        typology: def.typology,
+        completionStatus: def.completionStatus,
+        completedYear: def.completedYear,
+        areaSqm: def.areaSqm,
+        durationWeeks: def.durationWeeks,
+        summary: def.summary,
+        architecturalBrief: def.architecturalBrief,
+        spatialNotes: def.spatialNotes,
+        structuralNotes: def.structuralNotes,
+        heroImage: def.heroImage,
+        sectionImage: def.sectionImage,
+        detailImage: def.detailImage,
+        layoutVariant: def.layoutVariant,
+        specsJson: JSON.stringify(def.specs),
+      })
+      .returning();
+
+    const [, contractor] = await db
+      .insert(parties)
+      .values([
+        {
+          projectId: proj.id,
+          role: "owner",
+          name: def.ownerName,
+          city: def.ownerCity,
+          nearAccountId: def.ownerNearAccount,
+        },
+        {
+          projectId: proj.id,
+          role: "contractor",
+          name: def.contractorName,
+          city: def.siteCity,
+          nearAccountId: def.contractorNearAccount,
+        },
+        {
+          projectId: proj.id,
+          role: "foreman",
+          name: def.foremanName,
+          city: def.siteCity,
+        },
+      ])
+      .returning();
+
+    let cursor = startDate.getTime();
+    let prevStageId: string | null = null;
+    const insertedStages: (typeof stages.$inferSelect)[] = [];
+    for (const s of def.stages) {
+      const [row]: (typeof stages.$inferSelect)[] = await db
+        .insert(stages)
+        .values({
+          projectId: proj.id,
+          seq: s.seq,
+          name: s.name,
+          description: s.description,
+          startDate: new Date(cursor),
+          durationDays: s.days,
+          laborTrancheUsdCents: s.laborUsd * 100,
+          dependsOnStageId: prevStageId,
+          contractorId: contractor.id,
+          status: "paid",
+          acceptanceCriteria: s.criteria,
+          nearStageIndex: s.seq - 1,
+          nearStatus: "released",
+        })
+        .returning();
+      insertedStages.push(row);
+      prevStageId = row.id;
+      cursor += s.days * DAY;
+    }
+
+    const paymentRows: (typeof payments.$inferInsert)[] = [];
+    for (const [idx, sRow] of insertedStages.entries()) {
+      const sDef = def.stages[idx];
+      const ngn = usdCentsToNgn(sRow.laborTrancheUsdCents, def.ngnPerUsd);
+      paymentRows.push(
+        {
+          projectId: proj.id,
+          stageId: sRow.id,
+          kind: "funding",
+          direction: "in",
+          amountUsdCents: sRow.laborTrancheUsdCents,
+          amountNgn: ngn,
+          status: "completed",
+          idempotencyKey: `seed-${def.slug}-fund-${sDef.seq}`,
+          nearTxHash: sDef.fundTx,
+          approvedBy: def.ownerNearAccount,
+        },
+        {
+          projectId: proj.id,
+          stageId: sRow.id,
+          kind: "labor",
+          direction: "out",
+          amountUsdCents: sRow.laborTrancheUsdCents,
+          amountNgn: ngn,
+          payeeId: contractor.id,
+          status: "completed",
+          idempotencyKey: `seed-${def.slug}-labor-${sDef.seq}`,
+          nearTxHash: sDef.releaseTx,
+          approvedBy: def.ownerNearAccount,
+        },
+      );
+    }
+    await db.insert(payments).values(paymentRows);
+
+    await appendLedger(db, {
+      projectId: proj.id,
+      type: "project.completed_archive",
+      actor: `${def.ownerNearAccount} (owner wallet)`,
+      payload: {
+        slug: def.slug,
+        code: def.code,
+        nearProjectId: def.nearProjectId,
+        stagesSettled: insertedStages.length,
+        totalUsd: def.stages.reduce((sum, s) => sum + s.laborUsd, 0),
+        completedYear: def.completedYear,
+      },
+    });
+  }
 }
