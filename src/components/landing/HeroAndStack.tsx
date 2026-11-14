@@ -130,7 +130,7 @@ export function HeroAndStack({
         <CadFrame className="bg-card/55 p-8 md:p-14">
           <div className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-dashed border-ink/20 pb-5">
             <span className="font-mono text-[10px] tracking-[0.18em] text-muted uppercase">
-              LONDON → IBADAN · DIASPORA REMITTANCE ESCROW
+              AUTONOMOUS SETTLEMENT FOR PHYSICAL INFRASTRUCTURE
             </span>
             <span className="inline-flex items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-leaf uppercase">
               <span className="size-2 rounded-full bg-leaf" />
@@ -141,34 +141,29 @@ export function HeroAndStack({
           <div className="grid items-center gap-12 lg:grid-cols-12">
             <div className="space-y-8 lg:col-span-6">
               <h1 className="font-sans text-5xl font-medium tracking-[-0.055em] text-ink sm:text-6xl lg:text-[72px] lg:leading-[0.98]">
-                Every milestone earns its{" "}
+                Intelligence, built to{" "}
                 <span className="inline-block rounded-[4px] bg-vermilion px-3 py-0.5 text-[#f5f4f0]">
-                  release
+                  settle
                 </span>
                 .
               </h1>
 
               <p className="max-w-xl text-base leading-relaxed text-muted md:text-lg">
-                Lock Circle USDC stage-by-stage on NEAR. Your site foreman snaps progress photos with zero gas or
-                wallet setup, a NEAR AI Cloud TEE grades physical masonry against your on-chain{" "}
-                <code className="font-mono text-xs text-ink">criteria_hash</code>, and funds settle only on your{" "}
-                <span className="font-mono text-sm text-ink">1 yoctoNEAR</span> signature.
+                Homebound gives remote builders and local contractors the rails to fund, grade, and release stablecoin
+                construction tranches through attested AI; without losing visibility or control.
               </p>
 
               <div className="flex flex-wrap items-center gap-4 pt-2">
-                <Link href="/build" className="btn px-6 py-3.5 text-[11px]">
-                  Open Live Escrow →
-                </Link>
-                <Link href="/site" className="btn-ghost px-6 py-3.5 text-[11px]">
-                  Try Foreman Camera
-                </Link>
                 <button
                   type="button"
                   onClick={openWaitlistModal}
-                  className="cursor-pointer font-mono text-[11px] tracking-[0.14em] text-vermilion uppercase underline-offset-4 hover:underline"
+                  className="btn cursor-pointer px-6 py-3.5 text-[11px]"
                 >
-                  Join Waitlist
+                  Join Waitlist · Secure Access
                 </button>
+                <Link href="/build" className="btn-ghost px-6 py-3.5 text-[11px]">
+                  Open Live Escrow · Explore
+                </Link>
               </div>
             </div>
 

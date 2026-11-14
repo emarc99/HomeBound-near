@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ClientView } from "@/lib/client-view";
 import { txUrl } from "@/lib/near/shared";
@@ -83,6 +83,18 @@ export function SiteStudio({
   const [selectedId, setSelectedId] = useState<string>(defaultStage?.id ?? "");
   const selectedStage = view.stages.find((s) => s.id === selectedId) ?? view.stages[0];
   const [comparePct, setComparePct] = useState<number>(62);
+  const compareBoxRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = useRef(false);
+
+  const updateCompareFromClientX = (clientX: number) => {
+    const el = compareBoxRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const raw = ((clientX - rect.left) / rect.width) * 100;
+    const clamped = Math.min(95, Math.max(5, Math.round(raw)));
+    setComparePct(clamped);
+  };
   const [file, setFile] = useState<File | null>(null);
   const [activeSample, setActiveSample] = useState<SamplePhotoKey | null>(null);
   const [pending, start] = useTransition();
@@ -217,7 +229,43 @@ export function SiteStudio({
           </div>
         </div>
 
-        <div className="relative h-[340px] w-full overflow-hidden border border-line bg-paper md:h-[420px]">
+        <div
+          ref={compareBoxRef}
+          role="slider"
+          aria-label="Drag across image to compare CAD specification with site photograph"
+          aria-valuemin={5}
+          aria-valuemax={95}
+          aria-valuenow={comparePct}
+          tabIndex={0}
+          onPointerDown={(e) => {
+            isDraggingRef.current = true;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            updateCompareFromClientX(e.clientX);
+          }}
+          onPointerMove={(e) => {
+            if (!isDraggingRef.current) return;
+            updateCompareFromClientX(e.clientX);
+          }}
+          onPointerUp={(e) => {
+            isDraggingRef.current = false;
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            }
+          }}
+          onPointerCancel={() => {
+            isDraggingRef.current = false;
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowLeft") {
+              e.preventDefault();
+              setComparePct((p) => Math.max(5, p - 5));
+            } else if (e.key === "ArrowRight") {
+              e.preventDefault();
+              setComparePct((p) => Math.min(95, p + 5));
+            }
+          }}
+          className="relative h-[340px] w-full cursor-ew-resize touch-none overflow-hidden border border-line bg-paper select-none md:h-[420px]"
+        >
           {/* Bottom layer: Architectural CAD Spec */}
           <CadSpecLayer stageSeq={selectedStage?.seq ?? 3} criteriaHash={selectedStage?.criteriaHash ?? ""} />
 
@@ -243,8 +291,8 @@ export function SiteStudio({
             className="pointer-events-none absolute top-0 bottom-0 w-[2px] bg-vermilion shadow"
             style={{ left: `${comparePct}%` }}
           >
-            <div className="absolute top-1/2 -left-4 -translate-y-1/2 rounded-[2px] border border-vermilion bg-paper px-1.5 py-1 font-mono text-[9px] font-bold text-vermilion shadow">
-              |
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-[2px] border border-vermilion bg-paper px-1.5 py-1 font-mono text-[9px] font-bold text-vermilion shadow">
+              ◄ │ ►
             </div>
           </div>
         </div>

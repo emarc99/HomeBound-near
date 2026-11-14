@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Homebound® — Every milestone earns its release",
+  title: "Homebound® — Intelligence, built to settle",
   description:
-    "Diaspora construction escrow on NEAR. Fund Circle USDC per stage, verify physical masonry via NEAR AI Cloud TEE, and release funds only on your 1 yoctoNEAR wallet signature.",
+    "Homebound gives remote builders and local contractors the rails to fund, grade, and release stablecoin construction tranches through attested AI; without losing visibility or control.",
   icons: { icon: "/homebound.svg" },
 };
 
