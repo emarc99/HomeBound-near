@@ -3,6 +3,7 @@
 import { ArchitectureAndSequence } from "./landing/ArchitectureAndSequence";
 import { HeroAndStack } from "./landing/HeroAndStack";
 import { ManifestoAndPillars } from "./landing/ManifestoAndPillars";
+import { TeamFaqCtaFooter } from "./landing/TeamFaqCtaFooter";
 
 export function LandingInteractive({
   escrowAccount,
@@ -13,12 +14,16 @@ export function LandingInteractive({
   agentAccount: string;
   network: string;
 }) {
-  void agentAccount;
   return (
     <main className="flex-1 bg-paper">
       <HeroAndStack escrowAccount={escrowAccount} network={network} />
       <ManifestoAndPillars />
       <ArchitectureAndSequence />
+      <TeamFaqCtaFooter
+        escrowAccount={escrowAccount}
+        agentAccount={agentAccount}
+        network={network}
+      />
     </main>
   );
 }
