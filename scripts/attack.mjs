@@ -146,6 +146,22 @@ async function main() {
     );
   });
 
+  check("Criteria-hash mismatch attack is rejected by 4-part ref binding", () => {
+    assert.throws(
+      () =>
+        verifyEscrowVerdict({
+          modelId: fixture.model_id,
+          requestHash: fixture.request_hash,
+          expectedResponseHash: fixture.response_hash,
+          responseBody: fixture.response_body,
+          signatureHex: fixture.signature,
+          signerHex: fixture.signing_address,
+          expectedRef: `spike/0/deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef/${fixture.evidence_sha256}`,
+        }),
+      /ref mismatch/,
+    );
+  });
+
   check("Forged signature from attacker non-TEE Ed25519 key is rejected", () => {
     const attacker = crypto.generateKeyPairSync("ed25519");
     const forgedBody = JSON.stringify({
