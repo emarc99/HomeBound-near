@@ -1,56 +1,83 @@
 @import "tailwindcss";
 
 @theme {
-  --color-paper: #eae5dc;
-  --color-card: #f4f0e8;
-  --color-blueprint: #0f1d2d;
-  --color-blueprint-card: #16263b;
-  --color-blueprint-line: #263b54;
-  --color-ink: #0f1d2d;
-  --color-muted: #55606e;
-  --color-line: #cdc5b4;
-  --color-pepper: #d4882a;
-  --color-leaf: #0d8a5a;
-  --color-radar: #10b981;
-  --color-mint: #d1fae5;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: #edece8;
+  --color-card: #f5f4f0;
+  --color-plaster: #e3e2dc;
+  --color-ink: #111110;
+  --color-muted: #6b6a64;
+  --color-annotation: #9a9992;
+  --color-line: rgba(17, 17, 16, 0.16);
+  --color-line-strong: rgba(17, 17, 16, 0.34);
+  --color-vermilion: #f04600;
+  --color-pepper: #f04600;
+  --color-leaf: #2f7a4a;
+  --color-mint: #dcece2;
+  --color-amber: #c07a2c;
+  --color-crimson: #b3261e;
+  --color-blueprint: #111110;
+  --color-blueprint-card: #1a1a18;
+  --color-blueprint-line: #2e2d29;
+  --color-radar: #2f7a4a;
+  --font-sans: "Switzer", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--color-paper);
   color: var(--color-ink);
+  font-feature-settings: "ss01" on, "cv02" on;
 }
 
 ::selection {
-  background: var(--color-pepper);
-  color: var(--color-blueprint);
+  background: var(--color-vermilion);
+  color: #f5f4f0;
 }
 
 @utility btn {
-  @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-ink px-5 py-3 text-xs font-semibold tracking-wider text-paper uppercase transition hover:bg-blueprint-card active:translate-y-px disabled:pointer-events-none disabled:opacity-40;
+  @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-[3px] bg-ink px-5 py-3 font-mono text-[11px] font-medium tracking-[0.14em] text-paper uppercase transition hover:bg-vermilion hover:text-[#f5f4f0] active:translate-y-px disabled:pointer-events-none disabled:opacity-40;
 }
 
 @utility btn-pop {
-  @apply btn bg-pepper text-blueprint font-bold shadow-[0_2px_0_rgba(15,29,45,0.45)] hover:brightness-105;
+  @apply btn bg-vermilion text-[#f5f4f0] hover:bg-ink hover:text-paper;
 }
 
 @utility btn-ghost {
-  @apply btn bg-card text-ink ring-1 ring-line hover:ring-ink;
+  @apply btn border border-line bg-card text-ink hover:border-ink hover:bg-ink hover:text-paper;
 }
 
 @utility card {
-  @apply rounded-xl border border-line bg-card p-6;
+  @apply border border-line bg-card p-6 md:p-8;
 }
 
 @utility card-blueprint {
-  @apply rounded-xl border border-blueprint-line bg-blueprint p-6 text-[#f4f0e8] shadow-md;
+  @apply border border-blueprint-line bg-blueprint p-6 text-[#edece8] md:p-8;
 }
 
 @utility label {
-  @apply font-mono text-[11px] font-medium tracking-[0.14em] text-muted uppercase;
+  @apply font-mono text-[10px] font-medium tracking-[0.16em] text-muted uppercase;
 }
 
 @utility field {
-  @apply w-full rounded-lg border border-line bg-paper px-4 py-2.5 text-sm outline-none placeholder:text-muted/70 focus:border-ink;
+  @apply w-full rounded-[3px] border border-line bg-card px-4 py-3 text-sm text-ink outline-none placeholder:text-annotation focus:border-ink;
+}
+
+.cad-frame {
+  border: 1px dashed rgba(17, 17, 16, 0.24);
+  position: relative;
+}
+
+.halftone-stone {
+  background-image: radial-gradient(circle, rgba(17, 17, 16, 0.22) 1.2px, transparent 1.2px);
+  background-size: 5px 5px;
+}
+
+.halftone-vermilion {
+  background-color: #f48f60;
+  background-image: radial-gradient(circle, #f04600 1.4px, transparent 1.4px);
+  background-size: 5px 5px;
 }

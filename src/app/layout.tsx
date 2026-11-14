@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Homebound — every milestone earns its release",
+  title: "Homebound® — Every milestone earns its release",
   description:
-    "Milestone escrow on NEAR for diaspora construction. Fund Circle USDC per stage, verify contractor photos in a NEAR AI Cloud TEE, and release only on your wallet signature.",
+    "Diaspora construction escrow on NEAR. Fund Circle USDC per stage, verify physical masonry via NEAR AI Cloud TEE, and release funds only on your 1 yoctoNEAR wallet signature.",
   icons: { icon: "/homebound.svg" },
 };
 
@@ -25,7 +25,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   const config = nearPublicConfig();
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col font-sans">
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600,700&display=swap"
+        />
+      </head>
+      <body className="flex min-h-full flex-col bg-paper font-sans text-ink">
         <NearProvider config={config}>{children}</NearProvider>
       </body>
     </html>
