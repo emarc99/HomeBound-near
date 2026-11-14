@@ -1,6 +1,7 @@
 import { getHeroProject, getProjectView } from "@/lib/queries";
 import { nearPublicConfig } from "@/lib/near/config";
-import { formatUsdc, usdcForCents } from "@/lib/near/shared";
+import { formatUsdc, txUrl, usdcForCents } from "@/lib/near/shared";
+import { getChainProject } from "@/lib/near/views";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export async function GET() {
   }
 
   const cfg = nearPublicConfig();
+  const chain = view.project.nearProjectId ? await getChainProject(view.project.nearProjectId).catch(() => null) : null;
   const contractor = view.parties.find((p) => p.role === "contractor");
   const payeeAccount = contractor?.nearAccountId ?? "chidi.homebound-hq.testnet";
 
@@ -63,6 +65,8 @@ export async function GET() {
   ];
 
   const rows = view.stages.map((s) => {
+    const cs = s.nearStageIndex != null && chain ? chain.stages[s.nearStageIndex] : null;
+    const nearStatus = cs?.status ?? s.nearStatus;
     const stagePayments = view.payments.filter((p) => p.stageId === s.id);
     const refundedPayment = stagePayments.find((p) => p.status === "refunded");
     const fundedCents = stagePayments
@@ -82,11 +86,13 @@ export async function GET() {
       "";
     const status = refundedPayment
       ? "Refunded"
-      : trustedPaymentStatus(s.status, s.nearStatus, fundedCents, paidCents);
+      : trustedPaymentStatus(s.status, nearStatus, fundedCents, paidCents);
     const amountUsd = (s.laborTrancheUsdCents / 100).toFixed(2);
     const demoUsdc = formatUsdc(usdcForCents(s.laborTrancheUsdCents, cfg.demoDivisor));
     const amountNgn = Math.round((s.laborTrancheUsdCents / 100) * view.project.ngnPerUsd);
-    const explorerUrl = nearTxHash ? `${cfg.explorer}/transactions/${nearTxHash}` : "";
+    const criteriaHash = cs?.criteria_hash ?? s.criteriaHash;
+    const evidenceSha256 = stageEvidence?.sha256 ?? cs?.verdict?.evidence_sha256 ?? "";
+    const explorerUrl = nearTxHash ? txUrl(cfg, nearTxHash) : "";
     const updatedAt =
       (txPayment?.updatedAt ?? txPayment?.createdAt ?? stageEvidence?.createdAt ?? s.startDate).toISOString();
 
@@ -100,8 +106,8 @@ export async function GET() {
       demoUsdc,
       amountNgn,
       payeeAccount,
-      s.criteriaHash,
-      stageEvidence?.sha256 ?? "",
+      criteriaHash,
+      evidenceSha256,
       nearTxHash,
       explorerUrl,
       updatedAt,

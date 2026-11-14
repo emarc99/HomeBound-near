@@ -105,6 +105,7 @@ export function BookkeeperStageLedger({ view }: { view: ClientView }) {
               const cs = s.nearStageIndex != null && view.near.chain ? view.near.chain.stages[s.nearStageIndex] : null;
               const badge = trustedStatus(s, cs?.status);
               const ev = view.evidence.find((e) => e.stageId === s.id);
+              const evSha = ev?.sha256 ?? cs?.verdict?.evidence_sha256 ?? null;
               const pmt =
                 view.payments.find((p) => p.stageId === s.id && p.kind === "labor" && p.nearTxHash) ??
                 view.payments.find((p) => p.stageId === s.id && p.nearTxHash);
@@ -130,8 +131,8 @@ export function BookkeeperStageLedger({ view }: { view: ClientView }) {
                   <td className="py-4 pr-4 font-mono text-[11px] text-muted" title={s.criteriaHash}>
                     {shortHash(s.criteriaHash)}
                   </td>
-                  <td className="py-4 pr-4 font-mono text-[11px] text-muted" title={ev?.sha256 ?? ""}>
-                    {ev?.sha256 ? shortHash(ev.sha256) : <span className="text-annotation">—</span>}
+                  <td className="py-4 pr-4 font-mono text-[11px] text-muted" title={evSha ?? ""}>
+                    {evSha ? shortHash(evSha) : <span className="text-annotation">—</span>}
                   </td>
                   <td className="py-4 text-right font-mono text-[11px]">
                     {tx ? (

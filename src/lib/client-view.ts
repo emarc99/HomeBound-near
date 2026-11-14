@@ -90,8 +90,24 @@ export function toClientView(v: ProjectView, near: ClientNear): ClientView {
       ngnPerUsd: v.project.ngnPerUsd,
     },
     stages: v.stages.map((s) => {
-      const funded = v.payments.filter((p) => p.stageId === s.id && p.kind === "funding" && p.status === "completed");
-      const laborPaid = v.payments.filter((p) => p.stageId === s.id && p.kind === "labor" && p.status === "completed");
+      const cs = s.nearStageIndex != null && near.chain ? near.chain.stages[s.nearStageIndex] : null;
+      const effectiveNearStatus = cs?.status ?? s.nearStatus;
+      const effectiveStatus =
+        effectiveNearStatus === "released"
+          ? "paid"
+          : effectiveNearStatus === "proposed"
+            ? "verified"
+            : effectiveNearStatus === "funded" && s.status === "planned"
+              ? "funded"
+              : s.status;
+      const fundedFromPayments = v.payments
+        .filter((p) => p.stageId === s.id && p.kind === "funding" && p.status === "completed")
+        .reduce((a, p) => a + p.amountUsdCents, 0);
+      const paidFromPayments = v.payments
+        .filter((p) => p.stageId === s.id && p.kind === "labor" && p.status === "completed")
+        .reduce((a, p) => a + p.amountUsdCents, 0);
+      const isFundedOnChain =
+        effectiveNearStatus === "funded" || effectiveNearStatus === "proposed" || effectiveNearStatus === "released";
       return {
         id: s.id,
         seq: s.seq,
@@ -101,14 +117,14 @@ export function toClientView(v: ProjectView, near: ClientNear): ClientView {
         durationDays: s.durationDays,
         laborTrancheUsdCents: s.laborTrancheUsdCents,
         laborTrancheNgn: Math.round((s.laborTrancheUsdCents / 100) * v.project.ngnPerUsd),
-        status: s.status,
+        status: effectiveStatus,
         dependsOnStageId: s.dependsOnStageId,
         acceptanceCriteria: s.acceptanceCriteria,
-        fundedUsdCents: funded.reduce((a, p) => a + p.amountUsdCents, 0),
-        laborPaidUsdCents: laborPaid.reduce((a, p) => a + p.amountUsdCents, 0),
+        fundedUsdCents: isFundedOnChain ? Math.max(fundedFromPayments, s.laborTrancheUsdCents) : fundedFromPayments,
+        laborPaidUsdCents: effectiveNearStatus === "released" ? Math.max(paidFromPayments, s.laborTrancheUsdCents) : paidFromPayments,
         nearStageIndex: s.nearStageIndex,
-        nearStatus: s.nearStatus,
-        criteriaHash: s.criteriaHash,
+        nearStatus: effectiveNearStatus,
+        criteriaHash: cs?.criteria_hash ?? s.criteriaHash,
       };
     }),
     payments: v.payments.map((p) => ({

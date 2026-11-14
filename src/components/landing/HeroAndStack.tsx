@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import type { ClientStage } from "@/lib/client-view";
 import { CadFrame, HalftoneBungalowSvg, openWaitlistModal, SectionEyebrow } from "./CadPrimitives";
+
+type StackStatus = "Paid" | "Proposed" | "Funded" | "Refunded" | "Planned";
 
 type StackStage = {
   seq: string;
@@ -10,7 +13,7 @@ type StackStage = {
   spec: string;
   trancheUsd: string;
   trancheNgn: string;
-  status: "Paid" | "Funded" | "Planned";
+  status: StackStatus;
   href: string;
 };
 
@@ -77,19 +80,49 @@ const REMITTANCE_STACK: StackStage[] = [
   },
 ];
 
-function badgeTone(status: StackStage["status"]) {
+function badgeTone(status: StackStatus) {
   if (status === "Paid") return "border-leaf/35 bg-mint text-leaf";
+  if (status === "Proposed") return "border-vermilion/40 bg-vermilion/12 text-vermilion";
   if (status === "Funded") return "border-amber/35 bg-amber/15 text-amber";
+  if (status === "Refunded") return "border-crimson/35 bg-crimson/10 text-crimson";
   return "border-line bg-paper text-muted";
+}
+
+function liveStackStatus(live?: ClientStage): StackStatus | null {
+  if (!live) return null;
+  if (live.nearStatus === "refunded") return "Refunded";
+  if (live.nearStatus === "released" || live.status === "paid") return "Paid";
+  if (live.nearStatus === "proposed") return "Proposed";
+  if (live.nearStatus === "funded" || live.fundedUsdCents > 0) return "Funded";
+  return "Planned";
 }
 
 export function HeroAndStack({
   escrowAccount,
   network,
+  stages,
 }: {
   escrowAccount: string;
   network: string;
+  stages?: ClientStage[];
 }) {
+  const bySeq = new Map((stages ?? []).map((s) => [s.seq, s]));
+  const totalUsd = stages?.length
+    ? `$${Math.round(stages.reduce((a, s) => a + s.laborTrancheUsdCents, 0) / 100).toLocaleString()}`
+    : "$7,000";
+  const stageCount = stages?.length || 6;
+
+  const cards = REMITTANCE_STACK.map((s) => {
+    const live = bySeq.get(Number(s.seq));
+    const status = liveStackStatus(live) ?? s.status;
+    return {
+      ...s,
+      name: live?.name ?? s.name,
+      trancheUsd: live ? `$${Math.round(live.laborTrancheUsdCents / 100).toLocaleString()} USDC` : s.trancheUsd,
+      trancheNgn: live ? `₦${live.laborTrancheNgn.toLocaleString()}` : s.trancheNgn,
+      status,
+    };
+  });
   return (
     <>
       {/* SECTION 01: HERO */}
@@ -155,7 +188,7 @@ export function HeroAndStack({
             <div className="flex flex-wrap items-center justify-between gap-4 font-mono text-[10px] tracking-[0.16em] text-muted uppercase">
               <span>|← 150 000 MM GEOFENCE RADIUS</span>
               <span className="hidden text-ink sm:inline">
-                6 STAGES · $7,000 ESCROW · 1 YOCTONEAR RELEASE AUTHORITY
+                {stageCount} STAGES · {totalUsd} ESCROW · 1 YOCTONEAR RELEASE AUTHORITY
               </span>
               <span>IBADAN, OYO →|</span>
             </div>
@@ -177,7 +210,7 @@ export function HeroAndStack({
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {REMITTANCE_STACK.map((s) => (
+          {cards.map((s) => (
             <Link key={s.seq} href={s.href} className="group block">
               <CadFrame className="flex h-full flex-col justify-between bg-card p-8 transition group-hover:border-ink">
                 <div className="space-y-5">
