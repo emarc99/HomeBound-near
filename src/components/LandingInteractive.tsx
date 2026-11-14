@@ -1,5 +1,6 @@
 "use client";
 
+import { ArchitectureAndSequence } from "./landing/ArchitectureAndSequence";
 import { HeroAndStack } from "./landing/HeroAndStack";
 import { ManifestoAndPillars } from "./landing/ManifestoAndPillars";
 
@@ -17,6 +18,7 @@ export function LandingInteractive({
     <main className="flex-1 bg-paper">
       <HeroAndStack escrowAccount={escrowAccount} network={network} />
       <ManifestoAndPillars />
+      <ArchitectureAndSequence />
     </main>
   );
 }
