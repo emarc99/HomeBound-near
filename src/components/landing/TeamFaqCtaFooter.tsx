@@ -47,7 +47,7 @@ export function TeamFaqCtaFooter({
           <div className="space-y-6 lg:col-span-6">
             <SectionEyebrow
               tag="HOMEBOUND'S TEAM"
-              title="One builder. Zero committees."
+              title="The people behind the intelligence."
               subtitle="Designed, written in Rust on NEAR, wired to NEAR AI Cloud TEE vision, and tested live against Circle Testnet USDC — purpose-built so diaspora builders never fund blind construction again."
             />
             <div className="grid max-w-md grid-cols-2 gap-4 pt-2 font-mono text-[11px] uppercase">
