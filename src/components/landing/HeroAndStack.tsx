@@ -152,12 +152,12 @@ export function HeroAndStack({
               <button
                 type="button"
                 onClick={openWaitlistModal}
-                className="btn cursor-pointer px-6 py-3.5 text-[11px]"
+                className="btn cursor-pointer whitespace-nowrap px-6 py-3.5 text-[11px]"
               >
-                Join Waitlist · Secure Access
+                Join Waitlist
               </button>
-              <Link href="/build" className="btn-ghost px-6 py-3.5 text-[11px]">
-                Open Live Escrow · Explore
+              <Link href="/build" className="btn-ghost whitespace-nowrap px-6 py-3.5 text-[11px]">
+                Open Live Escrow
               </Link>
             </div>
           </div>

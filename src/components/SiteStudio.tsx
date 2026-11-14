@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ClientView } from "@/lib/client-view";
 import { txUrl } from "@/lib/near/shared";
@@ -17,49 +17,153 @@ import { StagePipeline } from "./StagePipeline";
 
 const shortHex = (h: string) => (h.length > 26 ? `${h.slice(0, 12)}…${h.slice(-8)}` : h);
 
-function CadSpecLayer({ stageSeq, criteriaHash }: { stageSeq: number; criteriaHash: string }) {
+const BAYER4 = [
+  0, 8, 2, 10,
+  12, 4, 14, 6,
+  3, 11, 1, 9,
+  15, 7, 13, 5,
+].map((v) => (v + 0.5) / 16);
+
+function CadSpecLayer({
+  stageSeq,
+  criteriaHash,
+  imageSrc,
+}: {
+  stageSeq: number;
+  criteriaHash: string;
+  imageSrc: string;
+}) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const canvas = canvasRef.current;
+    if (!wrap || !canvas) return;
+
+    let cancelled = false;
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+
+    const renderContours = () => {
+      if (cancelled || !img.complete || img.naturalWidth === 0) return;
+      const w = Math.max(1, Math.floor(wrap.clientWidth));
+      const h = Math.max(1, Math.floor(wrap.clientHeight));
+      if (w < 4 || h < 4) return;
+
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
+
+      // Draw photo using identical object-cover crop geometry so contours match pixel-for-pixel
+      const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
+      const dx = (w - dw) / 2;
+      const dy = (h - dh) / 2;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(img, dx, dy, dw, dh);
+
+      const src = ctx.getImageData(0, 0, w, h);
+      const sdata = src.data;
+      const luma = new Float32Array(w * h);
+      for (let i = 0; i < w * h; i++) {
+        const o = i * 4;
+        luma[i] = (0.299 * sdata[o] + 0.587 * sdata[o + 1] + 0.114 * sdata[o + 2]) / 255;
+      }
+
+      const out = ctx.createImageData(w, h);
+      const d = out.data;
+
+      // Paint warm stone paper background (#f5f4f0) + subtle 40px CAD grid
+      for (let y = 0; y < h; y++) {
+        const gridY = y % 40 === 0;
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          const isGrid = gridY || x % 40 === 0;
+          d[i] = isGrid ? 228 : 245;
+          d[i + 1] = isGrid ? 226 : 244;
+          d[i + 2] = isGrid ? 220 : 240;
+          d[i + 3] = 255;
+        }
+      }
+
+      // Extract Sobel structural contours matching Hero Option 3 CAD morph aesthetic
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const idx = y * w + x;
+          const tl = luma[idx - w - 1];
+          const t  = luma[idx - w];
+          const tr = luma[idx - w + 1];
+          const l  = luma[idx - 1];
+          const r  = luma[idx + 1];
+          const bl = luma[idx + w - 1];
+          const b  = luma[idx + w];
+          const br = luma[idx + w + 1];
+
+          const gx = -tl - 2 * l - bl + tr + 2 * r + br;
+          const gy = -tl - 2 * t - tr + bl + 2 * b + br;
+          const edge = Math.min(1, Math.hypot(gx, gy) * 1.45);
+          const o = idx * 4;
+
+          if (edge > 0.20) {
+            const isVerm = edge > 0.44;
+            const alpha = Math.min(1, edge * 1.35);
+            const trRgb = isVerm ? [240, 70, 0] : [17, 17, 16];
+            d[o] = Math.round(d[o] * (1 - alpha) + trRgb[0] * alpha);
+            d[o + 1] = Math.round(d[o + 1] * (1 - alpha) + trRgb[1] * alpha);
+            d[o + 2] = Math.round(d[o + 2] * (1 - alpha) + trRgb[2] * alpha);
+          } else if (x % 2 === 0 && y % 2 === 0) {
+            // Subtle Bayer stipple point-cloud traces along masonry shadow volumes
+            const bx = (x >> 1) & 3;
+            const by = (y >> 1) & 3;
+            const density = (1 - luma[idx]) * 0.24;
+            if (density > BAYER4[by * 4 + bx]) {
+              d[o] = 185;
+              d[o + 1] = 178;
+              d[o + 2] = 168;
+            }
+          }
+        }
+      }
+
+      ctx.putImageData(out, 0, 0);
+    };
+
+    img.onload = renderContours;
+    img.src = imageSrc;
+
+    const ro = new ResizeObserver(renderContours);
+    ro.observe(wrap);
+
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+    };
+  }, [imageSrc]);
+
   return (
-    <div className="relative flex h-full w-full flex-col justify-between bg-paper p-6">
-      <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.14em] text-vermilion uppercase">
-        <span>CAD SPEC OVERLAY · STAGE 0{stageSeq}</span>
-        <span>CRITERIA SHA-256: {criteriaHash.slice(0, 14)}…</span>
+    <div ref={wrapRef} className="relative h-full w-full overflow-hidden bg-paper">
+      <canvas ref={canvasRef} className="block h-full w-full" aria-hidden />
+
+      <div className="pointer-events-none absolute top-4 right-4 left-4 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] tracking-[0.14em] uppercase">
+        <span className="border border-vermilion/35 bg-paper/92 px-2.5 py-1 text-vermilion">
+          CAD VECTOR CONTOURS · STAGE 0{stageSeq}
+        </span>
+        <span className="border border-line bg-paper/92 px-2.5 py-1 text-ink">
+          CRITERIA SHA-256: {criteriaHash.slice(0, 14)}…
+        </span>
       </div>
 
-      <svg viewBox="0 0 640 280" className="my-auto h-auto w-full select-none" aria-hidden>
-        <defs>
-          <pattern id="compare-grid" width="24" height="24" patternUnits="userSpaceOnUse">
-            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#111110" strokeOpacity="0.1" strokeWidth="0.7" />
-          </pattern>
-        </defs>
-        <rect width="640" height="280" fill="url(#compare-grid)" />
-        <rect x="60" y="64" width="520" height="164" fill="none" stroke="#111110" strokeWidth="1.5" />
-        {/* Lintel beam */}
-        <rect
-          x="60"
-          y="64"
-          width="520"
-          height="28"
-          fill="#f04600"
-          fillOpacity="0.14"
-          stroke="#f04600"
-          strokeWidth="1.4"
-          strokeDasharray="5 3"
-        />
-        <text x="76" y="82" fill="#f04600" fontFamily="monospace" fontSize="11" fontWeight="600">
-          REINFORCED LINTEL RING BEAM (+2.85M)
-        </text>
-        {/* Window voids */}
-        <rect x="112" y="114" width="128" height="70" fill="none" stroke="#111110" strokeWidth="1.2" strokeDasharray="3 3" />
-        <rect x="400" y="114" width="128" height="70" fill="none" stroke="#111110" strokeWidth="1.2" strokeDasharray="3 3" />
-        <rect x="278" y="114" width="84" height="114" fill="none" stroke="#111110" strokeWidth="1.4" />
-        <text x="62" y="250" fill="#6b6a64" fontFamily="monospace" fontSize="9.5">
-          AKOBO BUNGALOW ELEVATION · 9-INCH OUTER / 6-INCH PARTITION MASONRY
-        </text>
-      </svg>
-
-      <div className="flex items-center justify-between font-mono text-[10px] text-muted uppercase">
-        <span>DATUM ±0.00M TO +3.20M</span>
-        <span>DRAG SLIDER TO COMPARE PHOTO →</span>
+      <div className="pointer-events-none absolute right-4 bottom-4 left-4 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase">
+        <span className="border border-line bg-paper/92 px-2.5 py-1 text-muted">
+          DATUM ±0.00M TO +3.20M
+        </span>
+        <span className="border border-vermilion/35 bg-paper/92 px-2.5 py-1 text-vermilion">
+          DRAG SLIDER TO COMPARE PHOTO →
+        </span>
       </div>
     </div>
   );
@@ -266,8 +370,12 @@ export function SiteStudio({
           }}
           className="relative h-[340px] w-full cursor-ew-resize touch-none overflow-hidden border border-line bg-paper select-none md:h-[420px]"
         >
-          {/* Bottom layer: Architectural CAD Spec */}
-          <CadSpecLayer stageSeq={selectedStage?.seq ?? 3} criteriaHash={selectedStage?.criteriaHash ?? ""} />
+          {/* Bottom layer: Pixel-matched structural CAD vector contours */}
+          <CadSpecLayer
+            stageSeq={selectedStage?.seq ?? 3}
+            criteriaHash={selectedStage?.criteriaHash ?? ""}
+            imageSrc={compareImageSrc}
+          />
 
           {/* Clipped foreground layer: Field Photo */}
           <div
