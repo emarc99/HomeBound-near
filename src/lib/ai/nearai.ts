@@ -35,7 +35,12 @@ const ANSWER_SCHEMA = {
   required: ["verdict", "confidence", "ref", "observations", "criteria", "authenticity", "authenticityNote"],
   properties: {
     verdict: { type: "string", enum: ["pass", "fail", "needs_review"] },
-    confidence: { type: "integer", minimum: 0, maximum: 100 },
+    confidence: {
+      type: "integer",
+      minimum: 0,
+      maximum: 100,
+      description: "Whole-number percentage from 0 to 100 (for example 92). Do not output a 0-1 decimal.",
+    },
     ref: { type: "string" },
     observations: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
     criteria: {
@@ -99,7 +104,7 @@ export async function assessStagePhotoNearAi(
     messages: [
       {
         role: "system",
-        content: `${INSPECTOR_SYSTEM} Copy the ref you are given into the ref field exactly. Keep internal reasoning concise (under 100 words) and output the JSON verdict immediately.`,
+        content: `${INSPECTOR_SYSTEM} Copy the ref you are given into the ref field exactly. Set confidence as an integer percentage from 0 to 100 (for example 90 for strong proof), never a 0-1 decimal. Keep internal reasoning concise (under 100 words) and output the JSON verdict immediately.`,
       },
       {
         role: "user",
