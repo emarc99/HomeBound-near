@@ -94,10 +94,13 @@ export async function assessStagePhotoNearAi(
     model,
     stream: false,
     temperature: 0,
-    max_tokens: 1400,
+    max_tokens: 4096,
     response_format: { type: "json_schema", json_schema: { name: "stage_verdict", strict: true, schema: ANSWER_SCHEMA } },
     messages: [
-      { role: "system", content: `${INSPECTOR_SYSTEM} Copy the ref you are given into the ref field exactly.` },
+      {
+        role: "system",
+        content: `${INSPECTOR_SYSTEM} Copy the ref you are given into the ref field exactly. Keep internal reasoning concise (under 100 words) and output the JSON verdict immediately.`,
+      },
       {
         role: "user",
         content: [
@@ -123,8 +126,12 @@ export async function assessStagePhotoNearAi(
   const responseBody = responseBytes.toString("utf8");
   if (!res.ok) throw new NearAiError(`NEAR AI returned HTTP ${res.status}: ${responseBody.slice(0, 200)}`);
 
-  const completion = JSON.parse(responseBody) as { id: string; choices?: { message?: { content?: string } }[] };
-  const answer = NearAnswer.parse(JSON.parse(stripFences(completion.choices?.[0]?.message?.content ?? "")));
+  const completion = JSON.parse(responseBody) as { id: string; choices?: { message?: { content?: string | null } }[] };
+  const rawContent = completion.choices?.[0]?.message?.content;
+  if (!rawContent || !rawContent.trim()) {
+    throw new NearAiError("NEAR AI completion returned empty content (reasoning exceeded token limit)");
+  }
+  const answer = NearAnswer.parse(JSON.parse(stripFences(rawContent)));
 
   const requestHash = sha256(Buffer.from(requestBody, "utf8"));
   const responseHash = sha256(responseBytes);
