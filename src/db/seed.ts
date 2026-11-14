@@ -91,13 +91,20 @@ export async function seed(db: Db): Promise<void> {
       siteRadiusM: 150,
       ngnPerUsd: NGN_PER_USD,
       startDate: new Date("2026-09-25T08:00:00Z"),
+      nearProjectId: "hb-akobo-bungalow",
     })
     .returning();
 
   const [owner, contractor, foreman] = await db
     .insert(parties)
     .values([
-      { projectId: hero.id, role: "owner", name: "Tunde Adeyemi", city: "London" },
+      {
+        projectId: hero.id,
+        role: "owner",
+        name: "Tunde Adeyemi",
+        city: "London",
+        nearAccountId: "tightrat3805.testnet",
+      },
       {
         projectId: hero.id,
         role: "contractor",
@@ -113,7 +120,9 @@ export async function seed(db: Db): Promise<void> {
   let prevStageId: string | null = null;
   const stageRows: (typeof stages.$inferSelect)[] = [];
   for (const [i, s] of HERO_STAGES.entries()) {
-    const status = i < 2 ? "paid" : "planned";
+    const status = i < 2 ? "paid" : i === 2 ? "funded" : "planned";
+    const nearStageIndex = i < 2 ? null : i - 2;
+    const nearStatus = i < 2 ? null : i === 2 ? ("funded" as const) : ("planned" as const);
     const [row]: (typeof stages.$inferSelect)[] = await db
       .insert(stages)
       .values({
@@ -128,6 +137,8 @@ export async function seed(db: Db): Promise<void> {
         contractorId: contractor.id,
         status,
         acceptanceCriteria: s.criteria,
+        nearStageIndex,
+        nearStatus,
       })
       .returning();
     stageRows.push(row);
@@ -163,12 +174,46 @@ export async function seed(db: Db): Promise<void> {
       },
     );
   }
+  const stageThree = stageRows[2];
+  if (stageThree) {
+    prePaidPayments.push({
+      projectId: hero.id,
+      stageId: stageThree.id,
+      kind: "funding",
+      direction: "in",
+      amountUsdCents: stageThree.laborTrancheUsdCents,
+      amountNgn: usdCentsToNgn(stageThree.laborTrancheUsdCents, NGN_PER_USD),
+      status: "completed",
+      idempotencyKey: "seed-fund-stage-3",
+      nearTxHash: "5QZEUpbC57uj2HCY5ASPtcjxpywEz5FaAdXGcNii6umX",
+      approvedBy: "tightrat3805.testnet",
+    });
+  }
   await db.insert(payments).values(prePaidPayments);
 
   await appendLedger(db, {
     projectId: hero.id,
     type: "project.created",
     actor: owner.name,
-    payload: { name: hero.name, stages: HERO_STAGES.length, contractor: contractor.name, foreman: foreman.name },
+    payload: {
+      name: hero.name,
+      stages: HERO_STAGES.length,
+      contractor: contractor.name,
+      foreman: foreman.name,
+      nearProjectId: "hb-akobo-bungalow",
+      nearCreateTx: "Ab3a3xjpdk7uerz5iZHkSqZJMiH7t3Em7WKfqJKT7TS1",
+    },
+  });
+  await appendLedger(db, {
+    projectId: hero.id,
+    type: "near.funded",
+    actor: "tightrat3805.testnet",
+    payload: {
+      nearProjectId: "hb-akobo-bungalow",
+      stageSeq: 3,
+      stageName: stageThree?.name ?? "Blockwork to lintel",
+      usdcRaw: "1500000",
+      nearTxHash: "5QZEUpbC57uj2HCY5ASPtcjxpywEz5FaAdXGcNii6umX",
+    },
   });
 }
