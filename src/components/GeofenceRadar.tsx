@@ -60,7 +60,6 @@ export function GeofenceRadar({
   const distance = haversineMeters(siteLat, siteLng, activePoint.lat, activePoint.lng);
   const inside = distance <= radiusMeters;
 
-  // Map lat/lng delta onto radar SVG centered at (280, 140), outer ring r=105 => radiusMeters.
   let pinX = 280;
   let pinY = 140;
   const maxVisualR = 105;
@@ -71,26 +70,25 @@ export function GeofenceRadar({
     pinX = Math.max(185, Math.min(375, 280 + dxMeters * scale));
     pinY = Math.max(45, Math.min(235, 140 - dyMeters * scale));
   } else {
-    // Clamp off-site vector onto outer warning perimeter along true bearing
     const angle = Math.atan2(-(activePoint.lat - siteLat), activePoint.lng - siteLng);
     pinX = 280 + Math.cos(angle) * 124;
     pinY = 140 + Math.sin(angle) * 108;
   }
 
-  const accent = inside ? "#10b981" : "#ef4444";
+  const accent = inside ? "#2f7a4a" : "#b3261e";
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1.5 font-mono text-[10px]">
           {hasLive && (
             <button
               type="button"
               onClick={() => setPreset("live")}
-              className={`cursor-pointer rounded border px-2.5 py-1 transition ${
+              className={`cursor-pointer rounded-[2px] border px-2.5 py-1 uppercase transition ${
                 preset === "live"
-                  ? "border-pepper bg-pepper/20 text-[#f4f0e8]"
-                  : "border-blueprint-line bg-blueprint-card text-[#a7b3c2] hover:text-white"
+                  ? "border-ink bg-ink text-paper"
+                  : "border-line bg-paper text-muted hover:text-ink"
               }`}
             >
               Active Stage EXIF
@@ -99,10 +97,10 @@ export function GeofenceRadar({
           <button
             type="button"
             onClick={() => setPreset("lintel-pass")}
-            className={`cursor-pointer rounded border px-2.5 py-1 transition ${
+            className={`cursor-pointer rounded-[2px] border px-2.5 py-1 uppercase transition ${
               preset === "lintel-pass"
-                ? "border-radar bg-radar/20 text-mint"
-                : "border-blueprint-line bg-blueprint-card text-[#a7b3c2] hover:text-white"
+                ? "border-leaf bg-mint text-leaf"
+                : "border-line bg-paper text-muted hover:text-ink"
             }`}
           >
             Akobo Sample (15m · PASS)
@@ -110,10 +108,10 @@ export function GeofenceRadar({
           <button
             type="button"
             onClick={() => setPreset("lagos-spoof")}
-            className={`cursor-pointer rounded border px-2.5 py-1 transition ${
+            className={`cursor-pointer rounded-[2px] border px-2.5 py-1 uppercase transition ${
               preset === "lagos-spoof"
-                ? "border-red-400 bg-red-500/20 text-red-200"
-                : "border-blueprint-line bg-blueprint-card text-[#a7b3c2] hover:text-white"
+                ? "border-crimson bg-crimson/12 text-crimson"
+                : "border-line bg-paper text-muted hover:text-ink"
             }`}
           >
             Lagos Spoof (121.6 km · BLOCK)
@@ -121,123 +119,102 @@ export function GeofenceRadar({
         </div>
 
         <span
-          className={`rounded px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wider uppercase ${
-            inside ? "bg-radar/20 text-mint" : "bg-red-500/20 text-red-200"
+          className={`rounded-[2px] border px-2.5 py-1 font-mono text-[10px] font-semibold tracking-wider uppercase ${
+            inside ? "border-leaf/35 bg-mint text-leaf" : "border-crimson/35 bg-crimson/10 text-crimson"
           }`}
         >
           {inside ? `Inside ${radiusMeters}m Fence` : "Geofence Violation"}
         </span>
       </div>
 
-      <div className="relative overflow-hidden rounded-lg border border-blueprint-line bg-[#09111c]">
-        <svg viewBox="0 0 560 280" className="block h-auto w-full" role="img" aria-label="Plot IB-04 Geofence Radar">
+      <div className="overflow-hidden border border-line bg-paper">
+        <svg viewBox="0 0 560 280" className="block h-auto w-full select-none" role="img" aria-label="Plot IB-04 Geofence Radar">
           <defs>
-            <radialGradient id="radarGlow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor={accent} stopOpacity="0.22" />
-              <stop offset="70%" stopColor={accent} stopOpacity="0.06" />
-              <stop offset="100%" stopColor="#09111c" stopOpacity="0" />
+            <radialGradient id="radarStoneGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor={accent} stopOpacity="0.16" />
+              <stop offset="70%" stopColor={accent} stopOpacity="0.05" />
+              <stop offset="100%" stopColor="#edece8" stopOpacity="0" />
             </radialGradient>
-            <pattern id="cadGrid" width="28" height="28" patternUnits="userSpaceOnUse">
-              <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#18273c" strokeWidth="0.7" />
+            <pattern id="cadStoneGrid" width="28" height="28" patternUnits="userSpaceOnUse">
+              <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#111110" strokeOpacity="0.09" strokeWidth="0.7" />
             </pattern>
           </defs>
 
-          {/* Background CAD grid & Akobo road vectors */}
-          <rect width="560" height="280" fill="url(#cadGrid)" />
-          <g stroke="#20324a" strokeWidth="1.2" fill="none" opacity="0.85">
-            <path d="M 0 182 Q 150 165 280 140 T 560 95" strokeWidth="2.4" stroke="#283d58" />
-            <path d="M 190 0 L 235 280" />
-            <path d="M 355 0 L 320 280" />
-            <path d="M 70 85 C 165 72, 230 118, 340 102 S 470 55, 560 72" strokeDasharray="4 4" />
-            <rect x="242" y="108" width="76" height="64" rx="2" stroke="#d4882a" strokeWidth="1" strokeDasharray="3 2" opacity="0.65" />
+          <rect width="560" height="280" fill="url(#cadStoneGrid)" />
+          <g stroke="#111110" strokeOpacity="0.22" strokeWidth="1" fill="none">
+            <path d="M 0 182 Q 150 165 280 140 T 560 95" strokeWidth="1.6" />
+            <path d="M 190 0 L 235 280" strokeDasharray="3 3" />
+            <path d="M 355 0 L 320 280" strokeDasharray="3 3" />
+            <rect x="242" y="108" width="76" height="64" stroke="#f04600" strokeOpacity="0.5" strokeDasharray="3 2" />
           </g>
 
-          <text x="16" y="22" fill="#71849c" fontSize="9.5" fontFamily="monospace" letterSpacing="1.2">
-            AKOBO, IBADAN · PLOT IB-04 TELEMETRY RADAR
+          <text x="16" y="22" fill="#6b6a64" fontSize="9.5" fontFamily="monospace" letterSpacing="1.2">
+            FIG. 2 · AKOBO PLOT IB-04 GEOFENCE RADAR
           </text>
-          <text x="410" y="22" fill="#71849c" fontSize="9.5" fontFamily="monospace">
+          <text x="430" y="22" fill="#6b6a64" fontSize="9.5" fontFamily="monospace">
             RADIUS: {radiusMeters}M
           </text>
 
-          {/* Radar glow & concentric geofence circles */}
-          <circle cx="280" cy="140" r={maxVisualR} fill="url(#radarGlow)" />
-          <circle cx="280" cy="140" r="35" fill="none" stroke="#28415e" strokeWidth="1" />
-          <circle cx="280" cy="140" r="70" fill="none" stroke="#28415e" strokeWidth="1" strokeDasharray="3 3" />
-          <circle cx="280" cy="140" r={maxVisualR} fill="none" stroke={accent} strokeWidth="1.5" opacity="0.85" />
+          <circle cx="280" cy="140" r={maxVisualR} fill="url(#radarStoneGlow)" />
+          <circle cx="280" cy="140" r="35" fill="none" stroke="#111110" strokeOpacity="0.18" strokeWidth="1" />
+          <circle cx="280" cy="140" r="70" fill="none" stroke="#111110" strokeOpacity="0.18" strokeDasharray="3 3" strokeWidth="1" />
+          <circle cx="280" cy="140" r={maxVisualR} fill="none" stroke={accent} strokeWidth="1.6" />
 
-          {/* Crosshair axes */}
-          <line x1="150" y1="140" x2="410" y2="140" stroke="#243852" strokeWidth="0.9" />
-          <line x1="280" y1="22" x2="280" y2="258" stroke="#243852" strokeWidth="0.9" />
+          <line x1="150" y1="140" x2="410" y2="140" stroke="#111110" strokeOpacity="0.18" strokeWidth="0.9" />
+          <line x1="280" y1="22" x2="280" y2="258" stroke="#111110" strokeOpacity="0.18" strokeWidth="0.9" />
 
-          {/* Plot center target */}
-          <circle cx="280" cy="140" r="3.5" fill="#d4882a" />
-          <text x="288" y="152" fill="#d4882a" fontSize="8.5" fontFamily="monospace">
-            SITE CENTER
+          <circle cx="280" cy="140" r="3.5" fill="#f04600" />
+          <text x="288" y="152" fill="#f04600" fontSize="8.5" fontFamily="monospace" fontWeight="600">
+            PLOT CENTER
           </text>
 
-          {/* Distance vector from center to EXIF coordinate pin */}
           <line
             x1="280"
             y1="140"
             x2={pinX}
             y2={pinY}
             stroke={accent}
-            strokeWidth="1.5"
+            strokeWidth="1.6"
             strokeDasharray={inside ? "2 2" : "5 3"}
           />
 
-          {/* Active EXIF pin */}
-          <circle cx={pinX} cy={pinY} r="11" fill={accent} opacity="0.22" />
-          <circle cx={pinX} cy={pinY} r="4.5" fill={accent} stroke="#09111c" strokeWidth="1.5" />
+          <circle cx={pinX} cy={pinY} r="10" fill={accent} fillOpacity="0.2" />
+          <circle cx={pinX} cy={pinY} r="4.5" fill={accent} stroke="#f5f4f0" strokeWidth="1.5" />
 
-          {/* Callout pill on SVG */}
           <rect
-            x={inside ? Math.min(350, pinX + 10) : 14}
+            x={inside ? Math.min(346, pinX + 10) : 14}
             y={inside ? Math.max(36, pinY - 30) : 230}
-            width={inside ? 186 : 254}
+            width={inside ? 196 : 264}
             height="34"
-            rx="4"
-            fill="#0f1d2d"
+            fill="#f5f4f0"
             stroke={accent}
             strokeWidth="1"
           />
           <text
-            x={inside ? Math.min(358, pinX + 18) : 22}
+            x={inside ? Math.min(354, pinX + 18) : 22}
             y={inside ? Math.max(50, pinY - 16) : 244}
-            fill="#f4f0e8"
+            fill="#111110"
             fontSize="9"
             fontFamily="monospace"
-            fontWeight="bold"
+            fontWeight="600"
           >
-            {activePoint.lat.toFixed(4)}°N, {activePoint.lng.toFixed(4)}°E
+            {inside ? `${formatDistance(distance)} FROM SITE` : `${formatDistance(distance)} OFF-PLOT`}
           </text>
           <text
-            x={inside ? Math.min(358, pinX + 18) : 22}
-            y={inside ? Math.max(62, pinY - 4) : 257}
-            fill={accent}
+            x={inside ? Math.min(354, pinX + 18) : 22}
+            y={inside ? Math.max(62, pinY - 4) : 256}
+            fill="#6b6a64"
             fontSize="8.5"
             fontFamily="monospace"
           >
-            {formatDistance(distance)} FROM SITE · {inside ? "VERIFIED" : "REJECTED"}
+            {activePoint.lat.toFixed(4)}°N, {activePoint.lng.toFixed(4)}°E
           </text>
         </svg>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 rounded-lg border border-blueprint-line bg-blueprint-card/60 px-3 py-2 font-mono text-[10px]">
-        <div>
-          <span className="block text-[#8c9ab0]">SITE COORDS</span>
-          <span className="text-[#f4f0e8]">{siteLat.toFixed(4)}°N, {siteLng.toFixed(4)}°E</span>
-        </div>
-        <div>
-          <span className="block text-[#8c9ab0]">DELTA FROM PLOT</span>
-          <span className={inside ? "font-semibold text-mint" : "font-semibold text-red-300"}>
-            {formatDistance(distance)} (max {radiusMeters}m)
-          </span>
-        </div>
-        <div>
-          <span className="block text-[#8c9ab0]">SOURCE</span>
-          <span className="truncate block text-[#f4f0e8]">{activePoint.label}</span>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] text-muted uppercase">
+        <span>Pin: {activePoint.label}</span>
+        <span>Distance: {formatDistance(distance)} / Limit {radiusMeters}m</span>
       </div>
     </div>
   );

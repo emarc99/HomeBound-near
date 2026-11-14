@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -14,10 +15,55 @@ import {
 import { GeofenceRadar } from "./GeofenceRadar";
 import { StagePipeline } from "./StagePipeline";
 
-type SiteViewTab = "viewfinder" | "radar";
-
 const shortHex = (h: string) => (h.length > 26 ? `${h.slice(0, 12)}…${h.slice(-8)}` : h);
-const RULER_TICKS = ["0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100", "110", "120"];
+
+function CadSpecLayer({ stageSeq, criteriaHash }: { stageSeq: number; criteriaHash: string }) {
+  return (
+    <div className="relative flex h-full w-full flex-col justify-between bg-paper p-6">
+      <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.14em] text-vermilion uppercase">
+        <span>CAD SPEC OVERLAY · STAGE 0{stageSeq}</span>
+        <span>CRITERIA SHA-256: {criteriaHash.slice(0, 14)}…</span>
+      </div>
+
+      <svg viewBox="0 0 640 280" className="my-auto h-auto w-full select-none" aria-hidden>
+        <defs>
+          <pattern id="compare-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#111110" strokeOpacity="0.1" strokeWidth="0.7" />
+          </pattern>
+        </defs>
+        <rect width="640" height="280" fill="url(#compare-grid)" />
+        <rect x="60" y="64" width="520" height="164" fill="none" stroke="#111110" strokeWidth="1.5" />
+        {/* Lintel beam */}
+        <rect
+          x="60"
+          y="64"
+          width="520"
+          height="28"
+          fill="#f04600"
+          fillOpacity="0.14"
+          stroke="#f04600"
+          strokeWidth="1.4"
+          strokeDasharray="5 3"
+        />
+        <text x="76" y="82" fill="#f04600" fontFamily="monospace" fontSize="11" fontWeight="600">
+          REINFORCED LINTEL RING BEAM (+2.85M)
+        </text>
+        {/* Window voids */}
+        <rect x="112" y="114" width="128" height="70" fill="none" stroke="#111110" strokeWidth="1.2" strokeDasharray="3 3" />
+        <rect x="400" y="114" width="128" height="70" fill="none" stroke="#111110" strokeWidth="1.2" strokeDasharray="3 3" />
+        <rect x="278" y="114" width="84" height="114" fill="none" stroke="#111110" strokeWidth="1.4" />
+        <text x="62" y="250" fill="#6b6a64" fontFamily="monospace" fontSize="9.5">
+          AKOBO BUNGALOW ELEVATION · 9-INCH OUTER / 6-INCH PARTITION MASONRY
+        </text>
+      </svg>
+
+      <div className="flex items-center justify-between font-mono text-[10px] text-muted uppercase">
+        <span>DATUM ±0.00M TO +3.20M</span>
+        <span>DRAG SLIDER TO COMPARE PHOTO →</span>
+      </div>
+    </div>
+  );
+}
 
 export function SiteStudio({
   view,
@@ -36,9 +82,9 @@ export function SiteStudio({
 
   const [selectedId, setSelectedId] = useState<string>(defaultStage?.id ?? "");
   const selectedStage = view.stages.find((s) => s.id === selectedId) ?? view.stages[0];
+  const [comparePct, setComparePct] = useState<number>(62);
   const [file, setFile] = useState<File | null>(null);
   const [activeSample, setActiveSample] = useState<SamplePhotoKey | null>(null);
-  const [tab, setTab] = useState<SiteViewTab>("viewfinder");
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
@@ -55,9 +101,9 @@ export function SiteStudio({
     if (d?.chainError) {
       setStatusNote(`Verdict: ${d.verdict}. ${d.chainError}`);
     } else if (d?.proposed) {
-      setStatusNote("Passed all 5 checks inside TEE and proposed payout on NEAR.");
+      setStatusNote("Passed all verification checks inside NEAR AI TEE and proposed payout on-chain.");
     } else if (d?.onChain) {
-      setStatusNote(`TEE signed verdict (${d.verdict}) recorded on NEAR.`);
+      setStatusNote(`TEE signed verdict (${d.verdict}) recorded on NEAR via gasless relayer.`);
     } else {
       setStatusNote(`Inspection finished (${d?.verdict ?? "done"}).`);
     }
@@ -93,32 +139,45 @@ export function SiteStudio({
     fd.append("photo", file);
     start(async () => {
       const res = await uploadStagePhotoAction(fd);
-      if (res.ok) setFile(null);
       handleResult(res);
     });
   };
 
-  const cameraLabel =
-    latest?.verdict?.extracted && typeof latest.verdict.extracted.camera === "string"
-      ? latest.verdict.extracted.camera
-      : null;
-  const verdict = latest?.verdict ?? null;
-  const confidencePct = verdict ? Math.round(verdict.confidence * 100) : null;
+  const compareImageSrc = latest?.blobKey
+    ? `/api/blobs/${encodeURIComponent(latest.blobKey)}`
+    : "/samples/lintel-pass.jpg";
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 pt-4 pb-16">
-      <section className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
-        <div>
-          <p className="label">
-            Foreman Field Inspection · {view.project.siteCity}, {view.project.siteState} (7.4370° N, 3.9470° E · 150m Geofence)
-          </p>
-          <h1 className="mt-1.5 text-3xl font-black tracking-tight sm:text-4xl">Submit site progress proof.</h1>
-        </div>
-        <Link href="/build" className="btn-ghost px-4 py-2 text-xs">
-          Owner Escrow (/build) →
-        </Link>
-      </section>
+    <main className="mx-auto w-full max-w-[1340px] flex-1 space-y-12 px-6 py-12 md:px-10 md:py-16">
+      {/* Hart Oliveira Sheet Header + Gasless Relay Pill */}
+      <header className="space-y-6 border-b border-dashed border-ink/25 pb-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <span className="font-mono text-[10px] tracking-[0.18em] text-vermilion uppercase">
+            SHEET S-10{selectedStage?.seq ?? 3} · (02) FOREMAN STUDIO · {view.project.siteCity.toUpperCase()}, {view.project.siteState.toUpperCase()}
+          </span>
 
+          <span className="inline-flex items-center gap-2 rounded-[2px] border border-leaf/40 bg-mint px-3.5 py-1.5 font-mono text-[10px] font-semibold tracking-[0.12em] text-leaf uppercase">
+            <span className="size-2 rounded-full bg-leaf" />
+            Gasless Relay Active — Foreman Needs 0 NEAR ({view.near.config.agent})
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="font-sans text-4xl font-medium tracking-[-0.045em] text-ink md:text-5xl">
+              Submit masonry proof &amp; run TEE verification.
+            </h1>
+            <p className="max-w-2xl text-base leading-relaxed text-muted">
+              No wallet extension or NEAR gas balance needed on site. Every photograph is hashed (SHA-256 + perceptual dHash), checked against the 150m Akobo geofence, and graded by <span className="font-mono text-xs text-ink">Qwen/Qwen3.8-27B</span>.
+            </p>
+          </div>
+          <Link href="/build" className="btn-ghost">
+            ← Back to (01) Escrow Vault
+          </Link>
+        </div>
+      </header>
+
+      {/* Shared Moss Keld Interactive Stage Selector */}
       <StagePipeline
         stages={view.stages}
         chainStages={view.near.chain?.stages ?? null}
@@ -132,276 +191,234 @@ export function SiteStudio({
         }}
       />
 
-      {selectedStage && (
-        <div className="grid items-start gap-6 lg:grid-cols-2">
-          {/* Left Sheet: Vellum Field Camera & 1-Click EXIF Samples */}
-          <section className="card space-y-5">
-            <div>
-              <p className="label">Stage {String(selectedStage.seq).padStart(2, "0")} Field Dispatch</p>
-              <h2 className="mt-1 text-2xl font-bold tracking-tight">{selectedStage.name}</h2>
-              <p className="mt-2 rounded-lg border border-line bg-paper px-3.5 py-2.5 text-xs text-muted">
-                <strong className="text-ink">Acceptance criteria:</strong> {selectedStage.acceptanceCriteria}
-              </p>
+      {/* HART OLIVEIRA FIG. 1: CAD LINE-DRAWING VS FOREMAN PHOTO SLIDER */}
+      <section className="space-y-5 border border-line bg-card p-6 md:p-10">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-dashed border-ink/20 pb-4">
+          <div>
+            <p className="font-mono text-[10px] tracking-[0.16em] text-vermilion uppercase">
+              FIG. 1 · LINE DRAWING VS. SITE PHOTOGRAPH COMPARE
+            </p>
+            <h2 className="mt-1 font-sans text-2xl font-medium tracking-[-0.03em] text-ink">
+              0{selectedStage?.seq ?? 3}. {selectedStage?.name ?? "Blockwork to lintel"}
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-4 font-mono text-[11px] uppercase">
+            <span className="text-muted">Split: {comparePct}% Photo</span>
+            <input
+              type="range"
+              min={5}
+              max={95}
+              value={comparePct}
+              onChange={(e) => setComparePct(Number(e.target.value))}
+              aria-label="Drag to compare architectural CAD specification with site photo"
+              className="w-36 accent-[#f04600] cursor-ew-resize"
+            />
+          </div>
+        </div>
+
+        <div className="relative h-[340px] w-full overflow-hidden border border-line bg-paper md:h-[420px]">
+          {/* Bottom layer: Architectural CAD Spec */}
+          <CadSpecLayer stageSeq={selectedStage?.seq ?? 3} criteriaHash={selectedStage?.criteriaHash ?? ""} />
+
+          {/* Clipped foreground layer: Field Photo */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ clipPath: `inset(0 ${100 - comparePct}% 0 0)` }}
+          >
+            <Image
+              unoptimized
+              src={compareImageSrc}
+              alt="Site evidence photograph"
+              fill
+              className="object-cover"
+            />
+            <span className="absolute top-4 left-4 bg-ink/85 px-3 py-1 font-mono text-[10px] tracking-[0.14em] text-paper uppercase">
+              {latest ? "LIVE SITE EVIDENCE" : "SAMPLE · LINTEL BEAM"}
+            </span>
+          </div>
+
+          {/* Vermilion divider hairline */}
+          <div
+            className="pointer-events-none absolute top-0 bottom-0 w-[2px] bg-vermilion shadow"
+            style={{ left: `${comparePct}%` }}
+          >
+            <div className="absolute top-1/2 -left-4 -translate-y-1/2 rounded-[2px] border border-vermilion bg-paper px-1.5 py-1 font-mono text-[9px] font-bold text-vermilion shadow">
+              |
             </div>
+          </div>
+        </div>
+      </section>
 
-            {selectedStage.status === "paid" ? (
-              <p className="rounded-lg border border-leaf/30 bg-mint px-3 py-2 text-xs font-medium text-leaf">
-                This stage is already settled. Select Stage 03 or later above to run live TEE inspections.
-              </p>
-            ) : (
-              <>
-                <div className="space-y-2.5">
-                  <p className="label">1-Click Field Samples (Real EXIF GPS + Timestamps)</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {(Object.entries(SAMPLE_PHOTOS) as [SamplePhotoKey, (typeof SAMPLE_PHOTOS)[SamplePhotoKey]][]).map(
-                      ([key, sample]) => {
-                        const isPass = key === "lintel-pass";
-                        const isRunning = pending && activeSample === key;
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            disabled={pending}
-                            onClick={() => triggerSample(key)}
-                            className="group flex cursor-pointer flex-col overflow-hidden rounded-lg border border-line bg-paper text-left transition hover:-translate-y-0.5 hover:border-ink disabled:pointer-events-none disabled:opacity-50"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={`/samples/${sample.file}`}
-                              alt={sample.label}
-                              className="h-24 w-full object-cover"
-                            />
-                            <div className="flex flex-1 flex-col justify-between gap-1.5 p-3">
-                              <div className="flex items-start justify-between gap-2">
-                                <span className="text-xs font-bold text-ink">
-                                  {isRunning ? "Inspecting in TEE…" : sample.label}
-                                </span>
-                                <span
-                                  className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
-                                    isPass ? "bg-mint text-leaf" : "bg-amber-100 text-amber-900"
-                                  }`}
-                                >
-                                  {sample.tag}
-                                </span>
-                              </div>
-                              <span className="text-[11px] text-muted">{sample.hint}</span>
-                            </div>
-                          </button>
-                        );
-                      },
-                    )}
-                  </div>
-                </div>
+      {/* FIELD CAPTURE PANEL: 1-CLICK EXIF SAMPLES + CUSTOM UPLOAD */}
+      <section className="grid gap-8 lg:grid-cols-12">
+        <div className="space-y-6 border border-line bg-card p-6 md:p-8 lg:col-span-7">
+          <div className="border-b border-dashed border-ink/20 pb-4">
+            <p className="font-mono text-[10px] tracking-[0.16em] text-vermilion uppercase">
+              01 · 1-CLICK EXIF FIELD SAMPLES &amp; UPLOAD
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              Click any real EXIF-stamped test frame to watch live NEAR AI Cloud vision grading + gasless NEAR contract submission.
+            </p>
+          </div>
 
-                <form
-                  onSubmit={uploadCustom}
-                  className="flex flex-col gap-3 border-t border-dashed border-line pt-4"
-                >
-                  <p className="label">Or upload your own JPEG / PNG / WebP</p>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={(ev) => setFile(ev.target.files?.[0] ?? null)}
-                    className="block w-full text-xs text-muted file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-ink file:px-4 file:py-2 file:text-xs file:font-semibold file:text-paper hover:file:opacity-90"
-                  />
-                  <button type="submit" disabled={pending || !file} className="btn-pop self-start px-5 py-2.5 text-xs">
-                    {pending && !activeSample ? "Inspecting in NEAR AI TEE…" : "Run TEE photo check"}
-                  </button>
-                </form>
-              </>
-            )}
-
-            {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</p>}
-            {statusNote && (
-              <p className="rounded-lg border border-leaf/25 bg-mint px-3 py-2 text-xs text-leaf">{statusNote}</p>
-            )}
-          </section>
-
-          {/* Right Card: Prussian CAD Viewfinder + Plot Geofence Radar Tab */}
-          <section className="card-blueprint space-y-4 p-4 sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blueprint-line pb-3">
-              <div>
-                <p className="font-mono text-[10px] tracking-[0.14em] text-[#8ea1b8] uppercase">
-                  Live 5-Gate TEE Verification
-                </p>
-                <h2 className="mt-0.5 text-lg font-bold tracking-tight text-[#f4f0e8]">
-                  {tab === "viewfinder" ? "CAD Inspection & TEE Receipt" : "Plot IB-04 Geofence Radar"}
-                </h2>
-              </div>
-
-              <div className="inline-flex rounded-lg border border-blueprint-line bg-[#09111c] p-0.5 font-mono text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => setTab("viewfinder")}
-                  className={`cursor-pointer rounded-md px-3 py-1.5 transition ${
-                    tab === "viewfinder" ? "bg-pepper font-bold text-blueprint" : "text-[#9cb0c7] hover:text-white"
-                  }`}
-                >
-                  CAD Viewfinder
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTab("radar")}
-                  className={`cursor-pointer rounded-md px-3 py-1.5 transition ${
-                    tab === "radar" ? "bg-radar font-bold text-blueprint" : "text-[#9cb0c7] hover:text-white"
-                  }`}
-                >
-                  Geofence Radar
-                </button>
-              </div>
-            </div>
-
-            {tab === "radar" ? (
-              <GeofenceRadar
-                photoLat={latest?.lat}
-                photoLng={latest?.lng}
-                photoLabel={latest ? `Stage ${String(selectedStage.seq).padStart(2, "0")} upload` : undefined}
-                takenAt={latest?.takenAt}
-              />
-            ) : latest ? (
-              <div className="space-y-3.5">
-                <div className="flex justify-between px-1 font-mono text-[9px] text-[#7c90a8]">
-                  {RULER_TICKS.map((t) => (
-                    <span key={t}>{t}</span>
-                  ))}
-                </div>
-
-                {latest.blobKey && (
-                  <div className="relative overflow-hidden rounded-lg border border-blueprint-line bg-[#09111c]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`/api/blobs/${encodeURIComponent(latest.blobKey)}`}
-                      alt={`Inspected photo for ${selectedStage.name}`}
-                      className="h-56 w-full object-cover"
-                    />
-                    <div className="pointer-events-none absolute inset-3 border border-white/20">
-                      <span className="absolute -top-px -left-px size-3 border-t-2 border-l-2 border-white/80" />
-                      <span className="absolute -top-px -right-px size-3 border-t-2 border-r-2 border-white/80" />
-                      <span className="absolute -bottom-px -left-px size-3 border-b-2 border-l-2 border-white/80" />
-                      <span className="absolute -right-px -bottom-px size-3 border-r-2 border-b-2 border-white/80" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(Object.entries(SAMPLE_PHOTOS) as [SamplePhotoKey, (typeof SAMPLE_PHOTOS)[SamplePhotoKey]][]).map(
+              ([key, sample]) => {
+                const isRunning = pending && activeSample === key;
+                const isFail = sample.tag.toLowerCase().includes("fail");
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={pending}
+                    onClick={() => triggerSample(key)}
+                    className="group flex cursor-pointer flex-col overflow-hidden border border-dashed border-ink/25 bg-paper/55 text-left transition hover:border-vermilion disabled:opacity-50"
+                  >
+                    <div className="relative h-32 w-full overflow-hidden border-b border-line bg-plaster">
+                      <Image
+                        src={`/samples/${sample.file}`}
+                        alt={sample.label}
+                        width={360}
+                        height={220}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                      />
                     </div>
-                    <div className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap justify-between gap-2">
-                      {latest.lat != null && latest.lng != null && (
-                        <span className="rounded bg-[#09111c]/85 px-2 py-1 font-mono text-[10px] text-[#f4f0e8]">
-                          {latest.lat.toFixed(4)}° N, {latest.lng.toFixed(4)}° E
+                    <div className="space-y-1.5 p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-sans text-base font-medium text-ink">
+                          {isRunning ? "Inspecting in TEE…" : sample.label}
                         </span>
-                      )}
-                      {latest.takenAt && (
-                        <span className="rounded bg-[#09111c]/85 px-2 py-1 font-mono text-[10px] text-[#f4f0e8]">
-                          {new Date(latest.takenAt).toISOString().slice(0, 16).replace("T", " ")} UTC
-                        </span>
-                      )}
-                    </div>
-                    <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap justify-between gap-2">
-                      <span className="rounded bg-[#09111c]/85 px-2 py-1 font-mono text-[10px] text-[#c7d3e3]">
-                        SHA-256: {shortHex(latest.chainVerdict?.responseHash ?? latest.blobKey ?? latest.id)}
-                      </span>
-                      {verdict && (
                         <span
-                          className={`rounded px-2.5 py-1 font-mono text-[10px] font-bold tracking-wider uppercase ${
-                            verdict.verdict === "pass"
-                              ? "bg-radar text-blueprint"
-                              : verdict.verdict === "fail"
-                                ? "bg-red-500 text-white"
-                                : "bg-pepper text-blueprint"
+                          className={`rounded-[2px] border px-2 py-0.5 font-mono text-[9px] uppercase ${
+                            isFail
+                              ? "border-crimson/35 bg-crimson/10 text-crimson"
+                              : "border-leaf/35 bg-mint text-leaf"
                           }`}
                         >
-                          {confidencePct}% CONFIDENCE · {verdict.verdict}
+                          {sample.tag}
                         </span>
-                      )}
+                      </div>
+                      <p className="font-mono text-[10px] text-muted">{sample.hint}</p>
                     </div>
-                  </div>
-                )}
+                  </button>
+                );
+              },
+            )}
+          </div>
 
-                <div className="flex justify-between px-1 font-mono text-[9px] text-[#7c90a8]">
-                  {RULER_TICKS.map((t) => (
-                    <span key={t}>{t}</span>
-                  ))}
-                </div>
+          <form onSubmit={uploadCustom} className="space-y-4 border-t border-dashed border-ink/20 pt-6">
+            <label className="label block">Or upload custom JPEG / PNG / WebP site frame</label>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                className="field flex-1 py-2 text-xs"
+              />
+              <button type="submit" disabled={pending || !file} className="btn-pop">
+                {pending && !activeSample ? "Submitting to NEAR AI TEE…" : "Upload & Grade (0 NEAR Gas)"}
+              </button>
+            </div>
+          </form>
 
-                {cameraLabel && (
-                  <p className="font-mono text-[11px] text-[#9cb0c7]">
-                    EXIF Device: <span className="text-[#f4f0e8]">{cameraLabel}</span>
+          {error && (
+            <div className="border border-crimson/35 bg-crimson/10 px-4 py-3 font-mono text-xs text-crimson">
+              {error}
+            </div>
+          )}
+          {statusNote && (
+            <div className="border border-leaf/35 bg-mint px-4 py-3 font-mono text-xs text-leaf">
+              {statusNote}
+            </div>
+          )}
+        </div>
+
+        {/* FIG. 2: 150M GEOFENCE RADAR */}
+        <div className="border border-line bg-card p-6 md:p-8 lg:col-span-5">
+          <GeofenceRadar
+            photoLat={latest?.lat}
+            photoLng={latest?.lng}
+            photoLabel={latest?.uploadedByName}
+            takenAt={latest?.takenAt}
+          />
+        </div>
+      </section>
+
+      {/* HART OLIVEIRA 3-COLUMN CRITERIA-BOUND TELEMETRY */}
+      <section className="grid gap-6 border border-line bg-card p-6 md:grid-cols-3 md:p-10">
+        <div className="space-y-3 border-b border-dashed border-ink/20 pb-5 md:border-r md:border-b-0 md:pr-6 md:pb-0">
+          <p className="font-mono text-[10px] tracking-[0.16em] text-vermilion uppercase">01 / PHYSICAL TELEMETRY</p>
+          <h3 className="font-sans text-xl font-medium text-ink">Latest Verdict Status</h3>
+          {latest?.verdict ? (
+            <div className="space-y-2">
+              <p className="font-mono text-sm font-semibold text-ink uppercase">
+                {latest.verdict.verdict} · {Math.round(latest.verdict.confidence * 100)}% CONFIDENCE
+              </p>
+              <ul className="space-y-1 font-mono text-[11px] text-muted">
+                {latest.verdict.checks.map((c) => (
+                  <li key={c.name} className={c.status === "pass" ? "text-leaf" : "text-crimson"}>
+                    [{c.status.toUpperCase()}] {c.name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-sm text-muted">Trigger a sample or upload a photo above to run all physical &amp; AI checks.</p>
+          )}
+        </div>
+
+        <div className="space-y-3 border-b border-dashed border-ink/20 pb-5 md:border-r md:border-b-0 md:pr-6 md:pb-0">
+          <p className="font-mono text-[10px] tracking-[0.16em] text-vermilion uppercase">02 / ON-CHAIN CRITERIA LOCK</p>
+          <h3 className="font-sans text-xl font-medium text-ink">Stage Criteria SHA-256</h3>
+          <p className="text-sm leading-relaxed text-muted">{selectedStage?.acceptanceCriteria}</p>
+          <p className="border border-dashed border-ink/20 bg-paper p-2.5 font-mono text-[10px] break-all text-ink">
+            {selectedStage?.criteriaHash}
+          </p>
+        </div>
+
+        <div className="flex flex-col justify-between space-y-4">
+          <div className="space-y-3">
+            <p className="font-mono text-[10px] tracking-[0.16em] text-vermilion uppercase">03 / GASLESS RELAY RECEIPTS</p>
+            <h3 className="font-sans text-xl font-medium text-ink">NEAR Settlement Status</h3>
+            {latest?.chainVerdict ? (
+              <div className="space-y-1.5 font-mono text-[11px]">
+                <p className="text-ink">Photo SHA-256: {shortHex(latest.sha256 ?? latest.id)}</p>
+                {latest.chainVerdict.submitTx && (
+                  <p>
+                    <a
+                      href={txUrl(view.near.config, latest.chainVerdict.submitTx)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-ink underline hover:text-vermilion"
+                    >
+                      submit_verdict tx: {shortHex(latest.chainVerdict.submitTx)}
+                    </a>
                   </p>
                 )}
-
-                {verdict && (
-                  <>
-                    {verdict.observations.length > 0 && (
-                      <ul className="space-y-1 text-xs text-[#c7d3e3]">
-                        {verdict.observations.map((obs, i) => (
-                          <li key={i} className="flex gap-2">
-                            <span className="text-pepper">›</span>
-                            <span>{obs}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-
-                    <div className="space-y-1.5">
-                      {verdict.checks.map((c) => (
-                        <div
-                          key={c.name}
-                          className="rounded-lg border border-blueprint-line bg-blueprint-card/75 px-3.5 py-2 text-xs"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-semibold text-[#f4f0e8]">{c.name}</span>
-                            <span
-                              className={`font-mono text-[10px] font-bold uppercase ${
-                                c.status === "pass"
-                                  ? "text-radar"
-                                  : c.status === "fail"
-                                    ? "text-red-400"
-                                    : "text-pepper"
-                              }`}
-                            >
-                              {c.status}
-                            </span>
-                          </div>
-                          <p className="mt-0.5 text-[11px] text-[#9db0c7]">{c.detail}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </>
+                {latest.chainVerdict.proposeTx && (
+                  <p>
+                    <a
+                      href={txUrl(view.near.config, latest.chainVerdict.proposeTx)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-vermilion underline"
+                    >
+                      propose_release tx: {shortHex(latest.chainVerdict.proposeTx)}
+                    </a>
+                  </p>
                 )}
-
-                {latest.chainVerdict && (
-                  <div className="space-y-1 rounded-lg border border-blueprint-line bg-[#09111c] p-3 font-mono text-[11px] text-[#9cb0c7]">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-[#f4f0e8]">
-                      <span className="font-semibold">TEE Ed25519 Receipt ({latest.chainVerdict.modelId})</span>
-                      {latest.chainVerdict.submitTx ? (
-                        <a
-                          href={txUrl(view.near.config, latest.chainVerdict.submitTx)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-radar underline"
-                        >
-                          Verified on NEAR ↗
-                        </a>
-                      ) : (
-                        <span className="text-pepper">Saved locally</span>
-                      )}
-                    </div>
-                    <p>Request hash: {shortHex(latest.chainVerdict.requestHash)}</p>
-                    <p>Response hash: {shortHex(latest.chainVerdict.responseHash)}</p>
-                    <p>Signature: {shortHex(latest.chainVerdict.signature)}</p>
-                    {latest.chainVerdict.error && <p className="text-pepper">{latest.chainVerdict.error}</p>}
-                  </div>
-                )}
-
-                <Link href="/build" className="btn-pop w-full justify-center py-3 text-xs">
-                  Go to Owner Escrow (/build) →
-                </Link>
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-blueprint-line bg-[#09111c] p-8 text-center text-xs text-[#9db0c7]">
-                Click one of the 4 EXIF-stamped field samples on the left or upload a site photo to watch all 5 checks
-                and NEAR AI Cloud&apos;s TEE signature execute — then switch to <strong className="text-mint">Geofence Radar</strong> to inspect the plot pin.
-              </div>
+              <p className="text-sm text-muted">Passing verdicts automatically invoke submit_verdict and propose_release on NEAR.</p>
             )}
-          </section>
+          </div>
+
+          <Link href="/build" className="btn w-full">
+            Proceed to (01) 1 yoctoNEAR Release →
+          </Link>
         </div>
-      )}
+      </section>
     </main>
   );
 }
