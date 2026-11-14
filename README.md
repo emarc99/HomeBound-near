@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/logos/homebound-logo-1-globe-arch.png" alt="HomeBound Logo" width="180" />
+  <img src="public/logos/homebound-logo-4-minimal-monogram.png" alt="HomeBound Logo" width="200" />
 </p>
 
 <h1 align="center">HomeBound: Autonomous Settlement for Physical Infrastructure</h1>
