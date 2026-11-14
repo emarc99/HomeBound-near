@@ -115,7 +115,7 @@ export default async function VerifyPage() {
               </p>
               <h1 className="font-sans text-4xl font-medium tracking-[-0.05em] text-ink md:text-6xl">
                 {formatUsdc(usdcForCents(paidUsdCents, cfg.demoDivisor))} /{" "}
-                {formatUsdc(usdcForCents(totalUsdCents, cfg.demoDivisor))} USDC Settled
+                {formatUsdc(usdcForCents(totalUsdCents, cfg.demoDivisor))} Settled
               </h1>
               <p className="text-base leading-relaxed text-muted md:text-lg">
                 <strong className="text-ink">${(paidUsdCents / 100).toLocaleString()} Paid</strong> ·{" "}

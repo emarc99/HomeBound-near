@@ -33,7 +33,7 @@ export type LedgerInput = {
   payload: Record<string, unknown>;
 };
 
-export async function appendLedger(db: Db, input: LedgerInput, attempt = 0): Promise<void> {
+export async function appendLedger(db: Db, input: LedgerInput, attempt = 0): Promise<{ seq: number; hash: string }> {
   const [last] = await db
     .select({ seq: ledgerEvents.seq, hash: ledgerEvents.hash })
     .from(ledgerEvents)
@@ -44,6 +44,7 @@ export async function appendLedger(db: Db, input: LedgerInput, attempt = 0): Pro
   const hash = hashEvent({ seq, prevHash, ...input });
   try {
     await db.insert(ledgerEvents).values({ seq, prevHash, hash, ...input });
+    return { seq, hash };
   } catch (err) {
     if (attempt < 5) return appendLedger(db, input, attempt + 1);
     throw err;

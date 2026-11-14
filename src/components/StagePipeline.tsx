@@ -277,7 +277,7 @@ export function StagePipeline({
                 <span className="font-semibold text-ink">
                   {currency === "NGN"
                     ? formatNgn(s.laborTrancheNgn)
-                    : `$${(s.laborTrancheUsdCents / 100).toLocaleString()} (${formatUsdc(usdcForCents(s.laborTrancheUsdCents, demoDivisor))}u)`}
+                    : `$${(s.laborTrancheUsdCents / 100).toLocaleString()} (${formatUsdc(usdcForCents(s.laborTrancheUsdCents, demoDivisor))})`}
                 </span>
                 {proofCount > 0 && <span className="text-leaf">{proofCount}p</span>}
               </div>

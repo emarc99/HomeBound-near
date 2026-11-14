@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
+import { joinWaitlistAction } from "@/app/actions/near";
 import { ConnectButton } from "./ConnectButton";
 
 const NAV_ITEMS = [
@@ -13,15 +14,23 @@ const NAV_ITEMS = [
 
 export function Header({ wallet = true }: { wallet?: boolean }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const [waitlistCorridor, setWaitlistCorridor] = useState("London -> Ibadan");
   const [waitlistBudget, setWaitlistBudget] = useState("$10,000 - $35,000 USDC");
   const [waitlistDone, setWaitlistDone] = useState(false);
+  const [waitlistSeq, setWaitlistSeq] = useState<number | null>(null);
+  const [waitlistError, setWaitlistError] = useState<string | null>(null);
+  const [waitlistPending, startWaitlist] = useTransition();
 
   useEffect(() => {
-    const onOpenWaitlist = () => setWaitlistOpen(true);
+    const onOpenWaitlist = () => {
+      setWaitlistError(null);
+      setWaitlistDone(false);
+      setWaitlistOpen(true);
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setDrawerOpen(false);
@@ -38,8 +47,22 @@ export function Header({ wallet = true }: { wallet?: boolean }) {
 
   function submitWaitlist(e: React.FormEvent) {
     e.preventDefault();
-    if (!waitlistEmail.trim()) return;
-    setWaitlistDone(true);
+    if (!waitlistEmail.trim() || waitlistPending) return;
+    setWaitlistError(null);
+    startWaitlist(async () => {
+      const res = await joinWaitlistAction({
+        email: waitlistEmail.trim(),
+        corridor: waitlistCorridor,
+        budget: waitlistBudget,
+      });
+      if (!res.ok) {
+        setWaitlistError(res.error);
+        return;
+      }
+      setWaitlistSeq(res.data?.seq ?? null);
+      setWaitlistDone(true);
+      router.refresh();
+    });
   }
 
   return (
@@ -210,12 +233,12 @@ export function Header({ wallet = true }: { wallet?: boolean }) {
             {waitlistDone ? (
               <div className="mt-6 space-y-4 border border-leaf/30 bg-mint/70 p-6">
                 <p className="font-mono text-[10px] tracking-[0.16em] text-leaf uppercase">
-                  ● REQUEST RECORDED IN QUEUE
+                  ● REQUEST RECORDED IN LEDGER{waitlistSeq ? ` · EVENT #${waitlistSeq}` : ""}
                 </p>
                 <p className="text-sm leading-relaxed text-ink">
                   Added <span className="font-mono font-semibold">{waitlistEmail}</span> for the{" "}
-                  <span className="font-semibold">{waitlistCorridor}</span> corridor ({waitlistBudget}). You can test
-                  live NEAR Testnet escrow right now in <Link href="/build" className="underline text-vermilion" onClick={() => setWaitlistOpen(false)}>(01) ESCROW</Link>.
+                  <span className="font-semibold">{waitlistCorridor}</span> corridor ({waitlistBudget}). View the
+                  entry in <Link href="/verify" className="underline text-vermilion" onClick={() => setWaitlistOpen(false)}>(03) LEDGER</Link> or test live NEAR Testnet escrow in <Link href="/build" className="underline text-vermilion" onClick={() => setWaitlistOpen(false)}>(01) ESCROW</Link>.
                 </p>
                 <button type="button" onClick={() => setWaitlistOpen(false)} className="btn">
                   Done
@@ -223,6 +246,11 @@ export function Header({ wallet = true }: { wallet?: boolean }) {
               </div>
             ) : (
               <form onSubmit={submitWaitlist} className="mt-6 space-y-5">
+                {waitlistError && (
+                  <div className="border border-crimson/35 bg-crimson/10 px-4 py-2.5 font-mono text-xs text-crimson">
+                    {waitlistError}
+                  </div>
+                )}
                 <div>
                   <label className="label block">Work or personal email</label>
                   <input
@@ -256,8 +284,8 @@ export function Header({ wallet = true }: { wallet?: boolean }) {
                 </div>
                 <div className="flex items-center justify-between pt-2">
                   <span className="font-mono text-[10px] text-muted uppercase">Non-custodial · NEAR + Circle USDC</span>
-                  <button type="submit" className="btn-pop">
-                    Confirm Request →
+                  <button type="submit" disabled={waitlistPending} className="btn-pop">
+                    {waitlistPending ? "Recording…" : "Confirm Request →"}
                   </button>
                 </div>
               </form>

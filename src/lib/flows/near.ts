@@ -278,6 +278,26 @@ export async function recordStageRefund(stageId: string, txHash: string, signerI
   await anchorLedgerHead(db, nearProjectId);
 }
 
+export async function recordAgentRotated(projectId: string, txHash: string, signerId: string) {
+  const db = await getDb();
+  const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
+  if (!project?.nearProjectId) throw new FlowError("This project isn't on NEAR yet.");
+  const nearProjectId = project.nearProjectId;
+  const tx = await readEscrowTx(txHash, signerId);
+  const [changed] = eventsFor(tx.escrowEvents, "agent_changed", nearProjectId);
+  if (tx.receiver !== nearPublicConfig().escrow || !changed) {
+    throw new FlowError("That transaction didn't update the project's relayer agent on the escrow contract.");
+  }
+
+  await appendLedger(db, {
+    projectId: project.id,
+    type: "near.agent_changed",
+    actor: `${tx.signer} (owner wallet)`,
+    payload: { nearProjectId, agent: String(changed.data.agent ?? ""), txHash },
+  });
+  await anchorLedgerHead(db, nearProjectId);
+}
+
 export async function pushVerdictToChain(input: {
   projectId: string;
   stageId: string;

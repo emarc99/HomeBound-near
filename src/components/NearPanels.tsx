@@ -193,7 +193,7 @@ export function NearProjectBanner({ view }: { view: ClientView }) {
         <div className="border border-dashed border-ink/20 bg-paper/60 p-3.5">
           <span className="label block">Builder Settled Balance</span>
           <span className="mt-1 block truncate font-medium text-ink">
-            {near.contractorUsdc ? `${formatUsdc(near.contractorUsdc)} USDC` : "0.00 USDC"} (1:{config.demoDivisor})
+            {near.contractorUsdc ? formatUsdc(near.contractorUsdc) : "0.00 USDC"} (1:{config.demoDivisor})
           </span>
         </div>
       </div>
@@ -315,7 +315,7 @@ export function NearStageEscrow({
     );
 
   const refundStage = () => {
-    if (!window.confirm(`Return ${formatUsdc(cs?.funded ?? "0")} USDC from escrow back to owner wallet? This stage cannot be re-funded.`)) {
+    if (!window.confirm(`Return ${formatUsdc(cs?.funded ?? "0")} from escrow back to owner wallet? This stage cannot be re-funded.`)) {
       return;
     }
     run("1 yoctoNEAR stage refund", async () => [escrowCall("refund_stage", {})], { kind: "refund", id: stage.id });
@@ -323,7 +323,11 @@ export function NearStageEscrow({
 
   const rotateAgent = () => {
     if (!newAgent.trim()) return;
-    run("Relayer rotation", async () => [escrowCall("set_agent", { agent: newAgent.trim() }, false)]);
+    run(
+      "Relayer rotation",
+      async () => [escrowCall("set_agent", { agent: newAgent.trim() }, false)],
+      { kind: "agent", id: view.project.id },
+    );
   };
 
   const triggerPropose = () =>
@@ -360,7 +364,7 @@ export function NearStageEscrow({
               : `$${(stage.laborTrancheUsdCents / 100).toLocaleString()} USD`}
           </p>
           <p className="text-[11px] text-muted">
-            Escrow Tranche: {formatUsdc(amountRaw.toString())} demo USDC
+            Escrow Tranche: {formatUsdc(amountRaw.toString())} (1:{config.demoDivisor} demo scale)
           </p>
         </div>
       </div>
@@ -377,7 +381,7 @@ export function NearStageEscrow({
               </span>
             </div>
             <p className="font-mono text-lg font-medium text-ink">
-              {formatUsdc(fundedRaw.toString())} / {formatUsdc(amountRaw.toString())} USDC
+              {formatUsdc(fundedRaw.toString())} / {formatUsdc(amountRaw.toString())}
             </p>
             <p className="text-xs leading-relaxed text-muted">
               USDC rests isolated in {config.escrow} for Stage 0{stage.seq} until verified masonry earns release.
@@ -393,7 +397,7 @@ export function NearStageEscrow({
             {projectId && index != null && cs?.status === "planned" && needed > 0n ? (
               accountId ? (
                 <button type="button" disabled={pending} onClick={fundStage} className="btn w-full">
-                  {pending ? "Signing ft_transfer_call…" : `Fund ${formatUsdc(needed.toString())} USDC`}
+                  {pending ? "Signing ft_transfer_call…" : `Fund ${formatUsdc(needed.toString())}`}
                 </button>
               ) : (
                 <button type="button" onClick={() => void connect()} className="btn-ghost w-full">
@@ -492,7 +496,7 @@ export function NearStageEscrow({
             {cs?.status === "proposed" ? (
               connectedIsOwner ? (
                 <button type="button" disabled={pending} onClick={approveRelease} className="btn-pop w-full">
-                  {pending ? "Signing 1 yoctoNEAR…" : `Release ${formatUsdc(cs.funded)} USDC (1 yoctoNEAR)`}
+                  {pending ? "Signing 1 yoctoNEAR…" : `Release ${formatUsdc(cs.funded)} (1 yoctoNEAR)`}
                 </button>
               ) : (
                 <button type="button" onClick={() => void connect()} className="btn w-full">

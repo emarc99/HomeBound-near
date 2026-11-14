@@ -126,7 +126,7 @@ export function BookkeeperStageLedger({ view }: { view: ClientView }) {
                   <td className="py-4 pr-4 font-mono text-xs text-ink">
                     {currency === "NGN"
                       ? formatNgn(s.laborTrancheNgn)
-                      : `$${(s.laborTrancheUsdCents / 100).toLocaleString()} (${demoUsdc}u)`}
+                      : `$${(s.laborTrancheUsdCents / 100).toLocaleString()} (${demoUsdc})`}
                   </td>
                   <td className="py-4 pr-4 font-mono text-[11px] text-muted" title={s.criteriaHash}>
                     {shortHash(s.criteriaHash)}

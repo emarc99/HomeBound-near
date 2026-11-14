@@ -96,7 +96,7 @@ export async function seed(db: Db): Promise<void> {
     })
     .returning();
 
-  const [owner, contractor, foreman] = await db
+  const [, contractor, foreman] = await db
     .insert(parties)
     .values([
       {
