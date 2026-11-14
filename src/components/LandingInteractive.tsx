@@ -1,6 +1,7 @@
 "use client";
 
 import { HeroAndStack } from "./landing/HeroAndStack";
+import { ManifestoAndPillars } from "./landing/ManifestoAndPillars";
 
 export function LandingInteractive({
   escrowAccount,
@@ -15,6 +16,7 @@ export function LandingInteractive({
   return (
     <main className="flex-1 bg-paper">
       <HeroAndStack escrowAccount={escrowAccount} network={network} />
+      <ManifestoAndPillars />
     </main>
   );
 }
