@@ -71,11 +71,17 @@ Diaspora homeowners send billions home annually to build residences, yet traditi
 ### Engine 2: Anti-Fraud Vision Pipeline & Cryptographic `ref` Binding (`src/lib/evidence/`, `src/lib/ai/`)
 Before a single token moves, every uploaded site photograph crosses three deterministic barriers and one TEE signature check:
 
-1. **Haversine Geofence Gate (`src/lib/evidence/image.ts`):** Parses raw JPEG GPS EXIF coordinates and rejects uploads farther than **$150\text{ m}$** (configurable per project) from site datum coordinates:
-   $$d = 2R \arcsin\left(\sqrt{\sin^2\left(\frac{\Delta\phi}{2}\right) + \cos\phi_1 \cos\phi_2 \sin^2\left(\frac{\Delta\lambda}{2}\right)}\right) \le r_{\text{site}}$$
-2. **Perceptual Recycling Barrier (64-bit dHash):** Computes a difference-hash fingerprint and compares Hamming distance $\Delta_H$ against every previously accepted evidence photo on the project, blocking cropped or re-saved images from earlier weeks.
+1. **Haversine Geofence Gate (`src/lib/evidence/image.ts`):** Parses raw JPEG GPS EXIF coordinates and rejects uploads farther than **150 m** (configurable per project) from site datum coordinates:
+
+   $$
+   d = 2R \arcsin\left(\sqrt{\sin^2\left(\frac{\Delta\phi}{2}\right) + \cos\phi_1 \cos\phi_2 \sin^2\left(\frac{\Delta\lambda}{2}\right)}\right) \le r_{\text{site}}
+   $$
+
+2. **Perceptual Recycling Barrier (64-bit dHash):** Computes a difference-hash fingerprint and compares Hamming distance ($\Delta_H$) against every previously accepted evidence photo on the project, blocking cropped or re-saved images from earlier weeks.
 3. **4-Part `criteria_hash` Binding (`submit_verdict`):** Inside NEAR AI Cloud (`Qwen/Qwen3.8-27B`), the TEE returns a deterministic structured JSON response signed with the enclave's hardware-backed Ed25519 key over `"{model_id}:{request_hash}:{response_sha256}"`. On-chain in Rust, `submit_verdict` verifies the registered Ed25519 signature (`ed25519-dalek` / `env::ed25519_verify`), prevents `response_hash` replay, and requires the signed JSON `ref` to match:
-   $$\text{ref} = \texttt{"\{project\_id\}/\{stage\}/\{criteria\_hash\}/\{evidence\_sha256\}"}$$
+   ```text
+   ref = "{project_id}/{stage}/{criteria_hash}/{evidence_sha256}"
+   ```
 
 ### Engine 3: `1 yoctoNEAR` Ownership & Sovereign Escape Hatches
 The TEE agent can call `propose_release(project_id, stage)`, creating a release proposal with a **7-day expiration (`PROPOSAL_TTL_NS = 7 days`)**. It can **never** call `approve_release`. Final Circle USDC settlement executes only when the homeowner attaches `1 yoctoNEAR` via NEAR Wallet (`@hot-labs/near-connect`).
