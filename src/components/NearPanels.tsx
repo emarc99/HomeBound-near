@@ -18,7 +18,12 @@ const short = (id: string) => (id.length > 26 ? `${id.slice(0, 12)}…${id.slice
 
 function Ext({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="font-mono underline decoration-current/40 underline-offset-2 hover:text-pepper">
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="font-mono underline decoration-current/40 underline-offset-2 hover:text-vermilion"
+    >
       {children}
     </a>
   );
@@ -31,19 +36,26 @@ function useWalletAction() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  const run = (label: string, calls: () => Promise<WalletCall[]>, record: { kind: NearTxKind; id: string }) =>
+  const run = (
+    label: string,
+    calls: () => Promise<WalletCall[]>,
+    record?: { kind: NearTxKind; id: string },
+  ) =>
     start(async () => {
       setError(null);
       setInfo(null);
       try {
         const hashes = await send(await calls());
         const hash = hashes[hashes.length - 1];
-        const res = await recordNearTxAction(record.kind, record.id, hash, accountId ?? "");
-        if (!res.ok) setError(res.error);
-        else {
-          setInfo(`${label} confirmed on NEAR.`);
-          router.refresh();
+        if (record) {
+          const res = await recordNearTxAction(record.kind, record.id, hash, accountId ?? "");
+          if (!res.ok) {
+            setError(res.error);
+            return;
+          }
         }
+        setInfo(`${label} confirmed on NEAR (${short(hash)}).`);
+        router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "The wallet did not sign the transaction.");
       }
@@ -56,10 +68,14 @@ function StatusAlerts({ error, info }: { error: string | null; info: string | nu
   return (
     <>
       {error && (
-        <p className="rounded-lg border border-red-400/40 bg-red-950/50 px-3 py-2 text-xs text-red-200">{error}</p>
+        <div className="border border-crimson/35 bg-crimson/10 px-4 py-3 font-mono text-xs text-crimson">
+          {error}
+        </div>
       )}
       {info && (
-        <p className="rounded-lg border border-radar/40 bg-radar/15 px-3 py-2 text-xs text-mint">{info}</p>
+        <div className="border border-leaf/35 bg-mint px-4 py-3 font-mono text-xs text-leaf">
+          {info}
+        </div>
       )}
     </>
   );
@@ -67,304 +83,220 @@ function StatusAlerts({ error, info }: { error: string | null; info: string | nu
 
 export function NearProjectBanner({ view }: { view: ClientView }) {
   const { near } = view;
-  const { config, chain } = near;
-  const wallet = useNearWallet();
+  const { accountId, connect } = useNearWallet();
   const { pending, error, info, run } = useWalletAction();
+  const { config, chain } = near;
 
-  const totalRaw = chain
-    ? chain.stages.reduce((a, s) => a + BigInt(s.amount), 0n)
-    : view.stages.reduce((a, s) => a + usdcForCents(s.laborTrancheUsdCents, config.demoDivisor), 0n);
-  const escrowedRaw = chain
-    ? chain.stages
-        .filter((s) => s.status === "funded" || s.status === "proposed")
-        .reduce((a, s) => a + BigInt(s.funded), 0n)
-    : 0n;
-  const releasedRaw = chain
-    ? chain.stages.filter((s) => s.status === "released").reduce((a, s) => a + BigInt(s.amount), 0n)
-    : 0n;
+  const unpaidCount = view.stages.filter((s) => s.status !== "paid").length;
 
-  const putOnChain = () =>
+  const createOnNear = () =>
     run(
-      "Project",
+      "Escrow project creation",
       async () => {
         const res = await nearProjectPlanAction(view.project.id);
-        if (!res.ok || !res.data) throw new Error(res.ok ? "No plan returned" : res.error);
+        if (!res.ok) throw new Error(res.error);
+        if (!res.data) throw new Error("Could not prepare NEAR project.");
         const plan = res.data;
-        const storage: WalletCall[] = plan.payeesNeedingStorage.map((account_id) => ({
-          receiverId: config.usdc,
-          methodName: "storage_deposit",
-          args: { account_id, registration_only: true },
-          gasTgas: 30,
-          deposit: plan.storageDeposit,
-        }));
-        return [
-          ...storage,
+        const calls: WalletCall[] = [
+          ...plan.payeesNeedingStorage.map((acct) => ({
+            receiverId: config.usdc,
+            methodName: "storage_deposit",
+            args: { account_id: acct, registration_only: true },
+            gasTgas: 30,
+            deposit: plan.storageDeposit,
+          })),
           {
             receiverId: config.escrow,
             methodName: "create_project",
-            args: {
-              project_id: plan.projectId,
-              agent: plan.agent,
-              stages: plan.stages.map(({ name, payee, amount, criteria_hash }) => ({
-                name,
-                payee,
-                amount,
-                criteria_hash,
-              })),
-            },
+            args: { project_id: plan.projectId, agent: plan.agent, stages: plan.stages },
             gasTgas: 100,
             deposit: plan.deposit,
           },
         ];
+        return calls;
       },
       { kind: "project", id: view.project.id },
     );
 
+  if (!near.nearProjectId) {
+    return (
+      <section className="space-y-4 border border-dashed border-ink/25 bg-card p-6 md:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] tracking-[0.16em] text-vermilion uppercase">
+              + STEP 01 · DEPLOY ESCROW PROJECT ON NEAR ({config.network.toUpperCase()})
+            </p>
+            <h2 className="font-sans text-xl font-medium tracking-[-0.02em] text-ink">
+              Initialize the {unpaidCount}-stage Circle USDC vault on {config.escrow}
+            </h2>
+          </div>
+          {accountId ? (
+            <button type="button" disabled={pending} onClick={createOnNear} className="btn-pop">
+              {pending ? "Creating Vault…" : "Create Project on NEAR"}
+            </button>
+          ) : (
+            <button type="button" onClick={() => void connect()} className="btn">
+              Connect Owner Wallet
+            </button>
+          )}
+        </div>
+        <StatusAlerts error={error} info={info} />
+      </section>
+    );
+  }
+
   return (
-    <section className="space-y-2.5 border-b border-line pb-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="label">
-            PLOT IB-04 · {view.project.siteCity}, {view.project.siteState} (7.4370° N, 3.9470° E) · Built from{" "}
-            {view.project.ownerCity}
-          </p>
-          <h1 className="mt-1.5 text-3xl font-black tracking-tight sm:text-4xl">{view.project.name}</h1>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {!near.nearProjectId && wallet.accountId ? (
-            <button type="button" disabled={pending} onClick={putOnChain} className="btn-pop px-5 py-2.5 text-xs">
-              {pending ? "Waiting for wallet…" : "Put project on NEAR"}
-            </button>
-          ) : null}
-          {!near.nearProjectId && !wallet.accountId ? (
-            <button type="button" onClick={() => void wallet.connect()} className="btn-pop px-5 py-2.5 text-xs">
-              Connect wallet to deploy
-            </button>
-          ) : null}
-          {chain ? (
-            <span className="rounded-lg border border-leaf/30 bg-mint px-3 py-1.5 font-mono text-xs font-semibold text-leaf">
-              Live on NEAR {config.network}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-xs text-muted">
-        <span>
-          Pool <strong className="text-ink">{formatUsdc(totalRaw.toString())}</strong>
-        </span>
-        <span>
-          Escrowed <strong className="text-ink">{formatUsdc(escrowedRaw.toString())}</strong>
-        </span>
-        <span>
-          Paid <strong className="text-ink">{formatUsdc(releasedRaw.toString())}</strong>
-        </span>
-        <span>
-          Contract <Ext href={accountUrl(config, config.escrow)}>{config.escrow}</Ext>
-        </span>
-        {near.contractorAccount && (
-          <span>
-            Payee <Ext href={accountUrl(config, near.contractorAccount)}>{short(near.contractorAccount)}</Ext>
+    <section className="space-y-4 border border-line bg-card p-6 md:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-dashed border-ink/20 pb-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="inline-flex items-center gap-2 rounded-[2px] border border-leaf/35 bg-mint px-2.5 py-1 font-mono text-[10px] font-medium tracking-[0.14em] text-leaf uppercase">
+            <span className="size-1.5 rounded-full bg-leaf" />
+            LIVE ESCROW · {config.network.toUpperCase()}
           </span>
-        )}
+          <span className="font-mono text-xs text-ink">
+            Project ID: <Ext href={accountUrl(config, config.escrow)}>{near.nearProjectId}</Ext>
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 font-mono text-[11px] text-muted">
+          {accountId ? (
+            <span>
+              Wallet: <strong className="text-ink">{accountId}</strong>
+            </span>
+          ) : (
+            <button type="button" onClick={() => void connect()} className="btn px-3.5 py-2 text-[10px]">
+              Connect Owner Wallet
+            </button>
+          )}
+        </div>
       </div>
 
-      {near.readError && (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">{near.readError}</p>
-      )}
-      {(error || info) && (
-        <div>
-          {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</p>}
-          {info && <p className="rounded-lg border border-leaf/25 bg-mint px-3 py-2 text-xs text-leaf">{info}</p>}
+      <div className="grid gap-4 font-mono text-[11px] sm:grid-cols-2 lg:grid-cols-4">
+        <div className="border border-dashed border-ink/20 bg-paper/60 p-3.5">
+          <span className="label block">Owner Authority (1 yoctoNEAR)</span>
+          <span className="mt-1 block truncate font-medium text-ink">
+            {chain?.owner ?? "tightrat3805.testnet"}
+          </span>
         </div>
-      )}
+        <div className="border border-dashed border-ink/20 bg-paper/60 p-3.5">
+          <span className="label block">Gasless Relayer Agent</span>
+          <span className="mt-1 block truncate font-medium text-ink">
+            {chain?.agent ?? config.agent}
+          </span>
+        </div>
+        <div className="border border-dashed border-ink/20 bg-paper/60 p-3.5">
+          <span className="label block">Payee (Nigeria Builder)</span>
+          <span className="mt-1 block truncate font-medium text-ink">
+            {near.contractorAccount ?? "chidi.homebound-hq.testnet"}
+          </span>
+        </div>
+        <div className="border border-dashed border-ink/20 bg-paper/60 p-3.5">
+          <span className="label block">Builder Settled Balance</span>
+          <span className="mt-1 block truncate font-medium text-ink">
+            {near.contractorUsdc ? `${formatUsdc(near.contractorUsdc)} USDC` : "0.00 USDC"} (1:{config.demoDivisor})
+          </span>
+        </div>
+      </div>
+
+      <StatusAlerts error={error} info={info} />
     </section>
   );
 }
 
 const CHAIN_STATUS_TEXT: Record<ChainStageStatus, string> = {
-  planned: "Awaiting owner USDC funding",
-  funded: "USDC locked · awaiting TEE photo verdict",
-  proposed: "AI proposed payout · owner 1 yoctoNEAR required",
-  released: "Paid out to contractor",
-  refunded: "Refunded to owner",
+  planned: "Planned on-chain — awaiting Circle USDC funding.",
+  funded: "Funded in Circle USDC — awaiting gasless site verification.",
+  proposed: "VERIFIED & PROPOSED — awaiting owner 1 yoctoNEAR signature (24h window).",
+  released: "Paid — Circle USDC settled to builder.",
+  refunded: "Refunded — Circle USDC returned to owner wallet.",
 };
 
-function SealEmblem({ kind }: { kind: "usdc" | "tee" | "key" }) {
-  return (
-    <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-dashed border-[#536c8a] bg-[#0b1623] font-mono text-sm font-bold text-[#c9d6e5] ring-1 ring-[#2a415d] ring-offset-2 ring-offset-[#16263b]">
-      {kind === "usdc" ? "$" : kind === "tee" ? "N" : "⚷"}
-    </span>
-  );
-}
-
-function SealRow({
-  kind,
-  done,
-  title,
-  detail,
+export function NearStageEscrow({
+  view,
+  stage,
+  currency = "USDC",
 }: {
-  kind: "usdc" | "tee" | "key";
-  done: boolean;
-  title: string;
-  detail: string;
+  view: ClientView;
+  stage: ClientStage;
+  currency?: "USDC" | "NGN";
 }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-blueprint-line bg-blueprint-card/75 px-4 py-3">
-      <div className="flex items-center gap-3.5">
-        <SealEmblem kind={kind} />
-        <div>
-          <p className="font-mono text-xs font-semibold tracking-wide text-[#f4f0e8]">{title}</p>
-          <p className="mt-0.5 text-xs text-[#9db0c7]">{detail}</p>
-        </div>
-      </div>
-      <span
-        className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-          done
-            ? "bg-radar text-blueprint"
-            : "border border-blueprint-line bg-[#0b1623] text-[#6d829c]"
-        }`}
-      >
-        {done ? "✓" : "·"}
-      </span>
-    </div>
-  );
-}
-
-export function NearStageEscrow({ view, stage }: { view: ClientView; stage: ClientStage }) {
   const router = useRouter();
   const { near } = view;
   const { config, chain } = near;
-  const wallet = useNearWallet();
+  const { accountId, connect } = useNearWallet();
   const { pending, error, info, run } = useWalletAction();
-  const [proposePending, startPropose] = useTransition();
-  const [proposeMsg, setProposeMsg] = useState<{ err: string | null; ok: string | null }>({ err: null, ok: null });
   const [overrideReason, setOverrideReason] = useState("");
-
-  const stageUsdcRaw =
-    stage.nearStageIndex != null && chain
-      ? chain.stages[stage.nearStageIndex].amount
-      : usdcForCents(stage.laborTrancheUsdCents, config.demoDivisor).toString();
-
-  if (stage.status === "paid" && stage.nearStageIndex == null) {
-    return (
-      <section className="card-blueprint space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <p className="font-mono text-[10px] tracking-[0.14em] text-[#8ea1b8] uppercase">
-              Three-Seal Engineering Stamp Vault
-            </p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#f4f0e8]">
-              {String(stage.seq).padStart(2, "0")}. {stage.name}
-            </h2>
-          </div>
-          <span className="rounded-md bg-radar/20 px-2.5 py-1 font-mono text-xs font-semibold text-mint">
-            SETTLED
-          </span>
-        </div>
-
-        <p className="text-sm text-[#a7b7ca]">{stage.description}</p>
-
-        <div className="space-y-2.5">
-          <SealRow
-            kind="usdc"
-            done={true}
-            title="SEAL 01 · COMPLETED BEFORE ON-CHAIN ROLLOUT"
-            detail={`${formatUsdc(stageUsdcRaw)} · ${formatNgn(stage.laborTrancheNgn)}`}
-          />
-          <SealRow
-            kind="tee"
-            done={true}
-            title="SEAL 02 · NEXT ACTIVE CONTRACT MILESTONE"
-            detail="Select Stage 03 (Blockwork to lintel) for live NEAR escrow"
-          />
-        </div>
-      </section>
-    );
-  }
-
-  if (stage.nearStageIndex == null || !chain || !near.nearProjectId) {
-    return (
-      <section className="card-blueprint space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <p className="font-mono text-[10px] tracking-[0.14em] text-[#8ea1b8] uppercase">
-              Three-Seal Engineering Stamp Vault
-            </p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#f4f0e8]">
-              {String(stage.seq).padStart(2, "0")}. {stage.name}
-            </h2>
-          </div>
-          <span className="rounded-md border border-blueprint-line bg-blueprint-card px-2.5 py-1 font-mono text-xs font-medium text-[#f4f0e8]">
-            {formatUsdc(stageUsdcRaw)} · {formatNgn(stage.laborTrancheNgn)}
-          </span>
-        </div>
-
-        <p className="text-sm text-[#a7b7ca]">{stage.description}</p>
-
-        <div className="space-y-2.5">
-          <SealRow
-            kind="usdc"
-            done={false}
-            title="SEAL 01 · CIRCLE USDC ESCROWED"
-            detail="Connect wallet and click 'Put project on NEAR' first"
-          />
-          <SealRow
-            kind="tee"
-            done={false}
-            title="SEAL 02 · NEAR AI CLOUD TEE VERDICT"
-            detail="Submit or test a site photo on Foreman Studio (/site)"
-          />
-          <SealRow
-            kind="key"
-            done={false}
-            title="SEAL 03 · OWNER 1 YOCTONEAR KEY"
-            detail="Ready for signature after Seals 01 & 02 clear"
-          />
-        </div>
-
-        {!wallet.accountId && (
-          <button type="button" onClick={() => void wallet.connect()} className="btn-pop w-full py-3.5 text-sm">
-            Connect wallet to deploy &amp; escrow
-          </button>
-        )}
-      </section>
-    );
-  }
+  const [newAgent, setNewAgent] = useState(chain?.agent ?? config.agent);
+  const [proposeMsg, setProposeMsg] = useState<{ err: string | null; ok: string | null }>({ err: null, ok: null });
+  const [proposing, startPropose] = useTransition();
 
   const index = stage.nearStageIndex;
+  const cs = index != null && chain ? chain.stages[index] : null;
   const projectId = near.nearProjectId;
-  const cs = chain.stages[index];
-  const isOwner = wallet.accountId === chain.owner;
-  const needed = BigInt(cs.amount) - BigInt(cs.funded);
-  const canFund = (cs.status === "planned" || needed > 0n) && cs.status !== "released" && cs.status !== "refunded";
-  const stageTxs = view.payments.filter((p) => p.stageId === stage.id && p.nearTxHash);
-  const matchingEv = view.evidence.find((e) => e.stageId === stage.id && e.chainVerdict?.responseHash === cs.verdict?.response_hash);
-  const canRetryPropose =
-    cs.status === "funded" &&
+
+  const evWithChain = view.evidence.find((e) => e.stageId === stage.id && e.chainVerdict);
+  const fundTx = view.payments.find((p) => p.stageId === stage.id && p.kind === "funding" && p.nearTxHash);
+  const payoutTx = view.payments.find((p) => p.stageId === stage.id && p.kind === "labor" && p.nearTxHash);
+
+  if (stage.status === "paid" && index == null) {
+    return (
+      <section className="border border-line bg-card p-6 md:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="font-mono text-[10px] tracking-[0.16em] text-leaf uppercase">
+              STAGE 0{stage.seq} · PREVIOUSLY SETTLED TRANCHE
+            </p>
+            <h3 className="mt-1 font-sans text-2xl font-medium tracking-[-0.03em] text-ink">
+              {stage.name}
+            </h3>
+            <p className="mt-1 text-sm text-muted">
+              Settled prior to live on-chain vault activation. Select Stage 03+ above to inspect active NEAR escrow controls.
+            </p>
+          </div>
+          <div className="border border-leaf/35 bg-mint px-4 py-2 font-mono text-xs font-semibold text-leaf">
+            Paid · {currency === "NGN" ? formatNgn(stage.laborTrancheNgn) : `$${(stage.laborTrancheUsdCents / 100).toLocaleString()} USD`}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const demoAmountRaw = usdcForCents(stage.laborTrancheUsdCents, config.demoDivisor);
+  const amountRaw = BigInt(cs?.amount ?? demoAmountRaw.toString());
+  const fundedRaw = BigInt(cs?.funded ?? "0");
+  const needed = amountRaw > fundedRaw ? amountRaw - fundedRaw : 0n;
+
+  const connectedIsOwner = accountId != null && chain != null && accountId === chain.owner;
+  const isFinal = cs?.status === "released" || cs?.status === "refunded";
+  const hasFunds = fundedRaw > 0n;
+  const hasPassingVerdict =
+    cs?.status === "funded" &&
     cs.verdict?.verdict === "pass" &&
     cs.verdict.confidence >= 60 &&
     cs.verdict.checks.taken_in_window &&
     cs.verdict.checks.on_site &&
     cs.verdict.checks.not_reused;
 
-  const escrowCall = (methodName: string, args: Record<string, unknown>): WalletCall => ({
+  const escrowCall = (methodName: string, args: Record<string, unknown>, includeStage = true): WalletCall => ({
     receiverId: config.escrow,
     methodName,
-    args: { project_id: projectId, stage: index, ...args },
+    args: includeStage ? { project_id: projectId, stage: index, ...args } : { project_id: projectId, ...args },
     gasTgas: 100,
     deposit: ONE_YOCTO,
   });
 
   const fundStage = () =>
     run(
-      "Stage funding",
+      "Stage Circle USDC funding",
       async () => [
         {
           receiverId: config.usdc,
           methodName: "ft_transfer_call",
-          args: { receiver_id: config.escrow, amount: needed.toString(), msg: JSON.stringify({ project_id: projectId, stage: index }) },
+          args: {
+            receiver_id: config.escrow,
+            amount: (needed > 0n ? needed : amountRaw).toString(),
+            msg: JSON.stringify({ project_id: projectId, stage: index }),
+          },
           gasTgas: 100,
           deposit: ONE_YOCTO,
         },
@@ -372,177 +304,306 @@ export function NearStageEscrow({ view, stage }: { view: ClientView; stage: Clie
       { kind: "fund", id: stage.id },
     );
 
-  const approveRelease = () => run("Stage payout", async () => [escrowCall("approve_release", {})], { kind: "release", id: stage.id });
+  const approveRelease = () =>
+    run("1 yoctoNEAR stage payout", async () => [escrowCall("approve_release", {})], { kind: "release", id: stage.id });
 
   const overrideRelease = () =>
-    run("Manual override payout", async () => [escrowCall("override_release", { reason: overrideReason.trim() })], {
-      kind: "release",
-      id: stage.id,
-    });
+    run(
+      "1 yoctoNEAR manual override",
+      async () => [escrowCall("override_release", { reason: overrideReason.trim() })],
+      { kind: "release", id: stage.id },
+    );
 
   const refundStage = () => {
-    if (!window.confirm(`Return ${formatUsdc(cs.funded)} from escrow back to owner wallet? This stage cannot be re-funded.`)) return;
-    run("Stage refund", async () => [escrowCall("refund_stage", {})], { kind: "refund", id: stage.id });
+    if (!window.confirm(`Return ${formatUsdc(cs?.funded ?? "0")} USDC from escrow back to owner wallet? This stage cannot be re-funded.`)) {
+      return;
+    }
+    run("1 yoctoNEAR stage refund", async () => [escrowCall("refund_stage", {})], { kind: "refund", id: stage.id });
   };
 
-  const retryPropose = () =>
+  const rotateAgent = () => {
+    if (!newAgent.trim()) return;
+    run("Relayer rotation", async () => [escrowCall("set_agent", { agent: newAgent.trim() }, false)]);
+  };
+
+  const triggerPropose = () =>
     startPropose(async () => {
       setProposeMsg({ err: null, ok: null });
       const res = await proposeStageReleaseAction(stage.id);
       if (!res.ok) setProposeMsg({ err: res.error, ok: null });
       else {
-        setProposeMsg({ err: null, ok: `Release proposed on NEAR (${res.data?.txHash.slice(0, 10)}…).` });
+        setProposeMsg({ err: null, ok: `propose_release landed (${res.data?.txHash.slice(0, 12)}…)` });
         router.refresh();
       }
     });
 
   return (
-    <section className="card-blueprint space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="font-mono text-[10px] tracking-[0.14em] text-[#8ea1b8] uppercase">
-            Three-Seal Engineering Stamp Vault
+    <section className="space-y-6 border border-line bg-card p-6 md:p-10">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-dashed border-ink/20 pb-5">
+        <div className="space-y-1.5">
+          <p className="font-mono text-[10px] tracking-[0.16em] text-vermilion uppercase">
+            THREE-SEAL ESCROW VAULT · SHEET A-10{stage.seq}
           </p>
-          <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#f4f0e8]">
-            {String(stage.seq).padStart(2, "0")}. {stage.name}
+          <h2 className="font-sans text-2xl font-medium tracking-[-0.03em] text-ink md:text-3xl">
+            0{stage.seq}. {stage.name}
           </h2>
-          <p className="mt-1 text-xs text-[#9db0c7]">{CHAIN_STATUS_TEXT[cs.status]}</p>
+          <p className="text-sm text-muted">
+            {cs ? CHAIN_STATUS_TEXT[cs.status] : "Connect project on NEAR to inspect live escrow seals."}
+          </p>
         </div>
-        <span className="rounded-md border border-blueprint-line bg-blueprint-card px-2.5 py-1 font-mono text-xs font-medium text-[#f4f0e8]">
-          {formatUsdc(cs.funded)} / {formatUsdc(cs.amount)}
-        </span>
+
+        <div className="text-right font-mono">
+          <p className="text-xl font-semibold text-ink">
+            {currency === "NGN"
+              ? formatNgn(stage.laborTrancheNgn)
+              : `$${(stage.laborTrancheUsdCents / 100).toLocaleString()} USD`}
+          </p>
+          <p className="text-[11px] text-muted">
+            Escrow Tranche: {formatUsdc(amountRaw.toString())} demo USDC
+          </p>
+        </div>
       </div>
 
-      <div className="space-y-2.5">
-        <SealRow
-          kind="usdc"
-          done={BigInt(cs.funded) >= BigInt(cs.amount) || cs.status === "released"}
-          title="SEAL 01 · CIRCLE USDC ESCROWED"
-          detail={`${formatUsdc(cs.amount)} locked for ${short(cs.payee)}`}
-        />
-        <SealRow
-          kind="tee"
-          done={Boolean(cs.verdict && cs.verdict.verdict === "pass")}
-          title="SEAL 02 · NEAR AI CLOUD TEE VERDICT"
-          detail={
-            cs.verdict
-              ? `${cs.verdict.verdict.toUpperCase()} (${cs.verdict.confidence}%) · Ed25519 verified`
-              : "Awaiting passing photo from Foreman Studio (/site)"
-          }
-        />
-        <SealRow
-          kind="key"
-          done={cs.status === "released"}
-          title="SEAL 03 · OWNER 1 YOCTONEAR KEY"
-          detail={
-            cs.status === "released"
-              ? "Approved & paid to contractor"
-              : cs.status === "proposed"
-                ? "Unlocked! Ready for owner signature"
-                : "Locked until Seals 01 & 02 clear"
-          }
-        />
-      </div>
-
-      <div className="flex flex-col gap-2.5">
-        {!wallet.accountId ? (
-          <button type="button" onClick={() => void wallet.connect()} className="btn-pop w-full py-3.5 text-sm">
-            Connect NEAR wallet to sign
-          </button>
-        ) : (
-          <>
-            {canFund && (
-              <button type="button" disabled={pending || !isOwner} onClick={fundStage} className="btn-pop w-full py-3.5 text-sm">
-                {pending ? "Signing…" : `Fund ${formatUsdc(needed.toString())} USDC`}
-              </button>
-            )}
-            {canRetryPropose && (
-              <button type="button" disabled={proposePending} onClick={retryPropose} className="btn w-full border border-blueprint-line bg-blueprint-card py-3 text-xs text-white">
-                {proposePending ? "Proposing…" : "Submit AI release proposal"}
-              </button>
-            )}
-            {cs.status === "proposed" && (
-              <button type="button" disabled={pending || !isOwner} onClick={approveRelease} className="btn-pop w-full py-3.5 text-sm">
-                {pending ? "Signing 1 yoctoNEAR…" : `Sign & Release ${formatUsdc(cs.amount)}`}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {wallet.accountId && !isOwner && cs.status !== "released" && cs.status !== "refunded" && (
-        <p className="text-xs text-[#9db0c7]">
-          Signed in as <span className="font-mono text-white">{short(wallet.accountId)}</span>. Only owner{" "}
-          <span className="font-mono text-white">{short(chain.owner)}</span> can fund, approve, override, or refund.
-        </p>
-      )}
-
-      {isOwner && (cs.status === "funded" || cs.status === "proposed") && (
-        <details className="rounded-xl border border-blueprint-line bg-blueprint-card/60 px-4 py-3 text-xs">
-          <summary className="cursor-pointer font-mono text-[11px] font-medium text-[#d2dce8]">
-            Owner escape controls (override / refund)
-          </summary>
-          <div className="mt-3 space-y-3">
-            {cs.status === "funded" && (
-              <div className="flex flex-wrap gap-2">
-                <input
-                  value={overrideReason}
-                  onChange={(e) => setOverrideReason(e.target.value)}
-                  placeholder="Reason to override AI block"
-                  className="min-w-[180px] flex-1 rounded-lg border border-blueprint-line bg-[#09111c] px-3 py-2 text-xs text-white placeholder:text-[#6f839c]"
-                />
-                <button
-                  type="button"
-                  disabled={pending || overrideReason.trim().length < 4}
-                  onClick={overrideRelease}
-                  className="btn border border-blueprint-line bg-blueprint px-3 py-2 text-xs"
-                >
-                  Override &amp; pay
-                </button>
-              </div>
-            )}
-            {BigInt(cs.funded) > 0n && (
-              <button
-                type="button"
-                disabled={pending}
-                onClick={refundStage}
-                className="btn border border-red-400/40 bg-red-950/40 px-3 py-2 text-xs text-red-200 hover:bg-red-900/50"
-              >
-                Refund {formatUsdc(cs.funded)} to owner
-              </button>
+      {/* Three Seals Grid */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* SEAL 01 */}
+        <div className="flex flex-col justify-between border border-dashed border-ink/25 bg-paper/60 p-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.15em] uppercase">
+              <span className="text-vermilion">SEAL 01 · CAPITAL LOCKED</span>
+              <span className={fundedRaw >= amountRaw && amountRaw > 0n ? "text-leaf" : "text-muted"}>
+                {fundedRaw >= amountRaw && amountRaw > 0n ? "FUNDED" : "OPEN"}
+              </span>
+            </div>
+            <p className="font-mono text-lg font-medium text-ink">
+              {formatUsdc(fundedRaw.toString())} / {formatUsdc(amountRaw.toString())} USDC
+            </p>
+            <p className="text-xs leading-relaxed text-muted">
+              USDC rests isolated in {config.escrow} for Stage 0{stage.seq} until verified masonry earns release.
+            </p>
+            {fundTx?.nearTxHash && (
+              <p className="font-mono text-[11px] text-leaf">
+                Receipt: <Ext href={txUrl(config, fundTx.nearTxHash)}>{short(fundTx.nearTxHash)}</Ext>
+              </p>
             )}
           </div>
-        </details>
-      )}
 
-      {matchingEv?.chainVerdict?.submitTx && (
-        <p className="font-mono text-[11px] text-[#9db0c7]">
-          Verdict tx: <Ext href={txUrl(config, matchingEv.chainVerdict.submitTx)}>{short(matchingEv.chainVerdict.submitTx)}</Ext>
-          {matchingEv.chainVerdict.proposeTx && (
-            <>
-              {" · Proposal tx: "}
-              <Ext href={txUrl(config, matchingEv.chainVerdict.proposeTx)}>{short(matchingEv.chainVerdict.proposeTx)}</Ext>
-            </>
-          )}
-        </p>
-      )}
+          <div className="mt-6 pt-4">
+            {projectId && index != null && cs?.status === "planned" && needed > 0n ? (
+              accountId ? (
+                <button type="button" disabled={pending} onClick={fundStage} className="btn w-full">
+                  {pending ? "Signing ft_transfer_call…" : `Fund ${formatUsdc(needed.toString())} USDC`}
+                </button>
+              ) : (
+                <button type="button" onClick={() => void connect()} className="btn-ghost w-full">
+                  Connect Wallet to Fund
+                </button>
+              )
+            ) : (
+              <div className="border border-line bg-card px-3 py-2 text-center font-mono text-[10px] text-muted uppercase">
+                {cs?.status === "released" ? "Tranche Disbursed" : "Capital Locked in Vault"}
+              </div>
+            )}
+          </div>
+        </div>
 
-      {stageTxs.length > 0 && (
-        <ul className="space-y-1 border-t border-dashed border-blueprint-line pt-3 text-xs text-[#d2dce8]">
-          {stageTxs.map((p) => (
-            <li key={p.id} className="flex items-center justify-between gap-2">
-              <Ext href={txUrl(config, p.nearTxHash as string)}>
-                {p.direction === "in" ? (p.status === "refunded" ? "Funded (refunded)" : "USDC funded") : `Paid ${p.payeeName ?? "contractor"}`}
-              </Ext>
-              <span className="font-mono text-[11px] text-[#8ea1b8]">
-                {new Date(p.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+        {/* SEAL 02 */}
+        <div className="flex flex-col justify-between border border-dashed border-ink/25 bg-paper/60 p-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.15em] uppercase">
+              <span className="text-vermilion">SEAL 02 · CRITERIA-BOUND AI</span>
+              <span className={cs?.verdict?.verdict === "pass" ? "text-leaf" : "text-muted"}>
+                {cs?.verdict ? `${cs.verdict.verdict.toUpperCase()} · ${cs.verdict.confidence}%` : "AWAITING PHOTO"}
               </span>
-            </li>
-          ))}
-        </ul>
-      )}
+            </div>
 
-      <StatusAlerts error={error ?? proposeMsg.err} info={info ?? proposeMsg.ok} />
+            <div className="border border-line bg-card p-3 font-mono text-[10px]">
+              <span className="label block">On-Chain Criteria SHA-256</span>
+              <span className="mt-1 block break-all text-ink">{cs?.criteria_hash ?? stage.criteriaHash}</span>
+            </div>
+
+            {cs?.verdict ? (
+              <div className="space-y-1 font-mono text-[10px] text-muted">
+                <p>
+                  Window: {String(cs.verdict.checks.taken_in_window)} · Site: {String(cs.verdict.checks.on_site)} · Novel:{" "}
+                  {String(cs.verdict.checks.not_reused)}
+                </p>
+                {evWithChain?.chainVerdict?.submitTx && (
+                  <p className="text-ink">
+                    Verdict Tx: <Ext href={txUrl(config, evWithChain.chainVerdict.submitTx)}>{short(evWithChain.chainVerdict.submitTx)}</Ext>
+                  </p>
+                )}
+                {evWithChain?.chainVerdict?.proposeTx && (
+                  <p className="text-ink">
+                    Proposal Tx: <Ext href={txUrl(config, evWithChain.chainVerdict.proposeTx)}>{short(evWithChain.chainVerdict.proposeTx)}</Ext>
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs leading-relaxed text-muted">
+                Site engineer submits EXIF-geofenced masonry photos from /site with zero NEAR gas.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-6 space-y-2 pt-4">
+            {hasPassingVerdict && (
+              <button type="button" disabled={proposing} onClick={triggerPropose} className="btn-pop w-full">
+                {proposing ? "Submitting propose_release…" : "Propose Release via Agent"}
+              </button>
+            )}
+            <a href={`/site?stage=${stage.id}`} className="btn-ghost w-full">
+              Open (02) Site Camera →
+            </a>
+            {proposeMsg.ok && <p className="font-mono text-[10px] text-leaf">{proposeMsg.ok}</p>}
+            {proposeMsg.err && <p className="font-mono text-[10px] text-crimson">{proposeMsg.err}</p>}
+          </div>
+        </div>
+
+        {/* SEAL 03 */}
+        <div className="flex flex-col justify-between border border-dashed border-ink/25 bg-paper/60 p-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.15em] uppercase">
+              <span className="text-vermilion">SEAL 03 · 1 YOCTONEAR RELEASE</span>
+              <span className={cs?.status === "proposed" ? "text-vermilion font-semibold" : cs?.status === "released" ? "text-leaf" : "text-muted"}>
+                {cs?.status === "proposed" ? "READY TO SIGN" : cs?.status === "released" ? "SETTLED" : "LOCKED"}
+              </span>
+            </div>
+
+            <p className="font-sans text-lg font-medium tracking-[-0.02em] text-ink">
+              {cs?.status === "released"
+                ? `Settled to ${short(cs.payee)}`
+                : cs?.status === "proposed"
+                  ? "Owner wallet signature unlocks USDC"
+                  : "Requires Passing TEE Verdict First"}
+            </p>
+            <p className="text-xs leading-relaxed text-muted">
+              Neither Homebound servers nor agent.homebound-hq.testnet can trigger approve_release. Only {chain?.owner ?? "the owner"} with 1 yoctoNEAR settles cash to {short(cs?.payee ?? "chidi.homebound-hq.testnet")}.
+            </p>
+            {payoutTx?.nearTxHash && (
+              <p className="font-mono text-[11px] text-leaf">
+                Payout Tx: <Ext href={txUrl(config, payoutTx.nearTxHash)}>{short(payoutTx.nearTxHash)}</Ext>
+              </p>
+            )}
+          </div>
+
+          <div className="mt-6 pt-4">
+            {cs?.status === "proposed" ? (
+              connectedIsOwner ? (
+                <button type="button" disabled={pending} onClick={approveRelease} className="btn-pop w-full">
+                  {pending ? "Signing 1 yoctoNEAR…" : `Release ${formatUsdc(cs.funded)} USDC (1 yoctoNEAR)`}
+                </button>
+              ) : (
+                <button type="button" onClick={() => void connect()} className="btn w-full">
+                  Connect {short(chain?.owner ?? "Owner")} to Release
+                </button>
+              )
+            ) : (
+              <div className="border border-line bg-card px-3 py-2 text-center font-mono text-[10px] text-muted uppercase">
+                {cs?.status === "released" ? "Finality Complete" : "Awaiting Seal 02 Proposal"}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ALWAYS-VISIBLE OWNER SOVEREIGNTY & ESCAPE HATCHES BAR */}
+      <div className="border-2 border-dashed border-vermilion/45 bg-paper p-6 md:p-8">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-dashed border-ink/20 pb-4">
+          <div>
+            <p className="font-mono text-[10px] font-semibold tracking-[0.16em] text-vermilion uppercase">
+              OWNER SOVEREIGNTY &amp; ESCAPE HATCHES · 1 YOCTONEAR AUTHORITY
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              Track 13 Open Innovation guarantee: human ownership overrides AI errors, halts work with instant refunds, and rotates compromised agent keys on-chain.
+            </p>
+          </div>
+          {!connectedIsOwner && (
+            <button type="button" onClick={() => void connect()} className="btn-ghost px-3.5 py-2 text-[10px]">
+              {accountId ? `Switch to Owner (${short(chain?.owner ?? "tightrat3805.testnet")})` : "Connect Owner Wallet"}
+            </button>
+          )}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Escape Hatch 1: refund_stage */}
+          <div className="flex flex-col justify-between border border-line bg-card p-5">
+            <div className="space-y-2">
+              <p className="font-mono text-[10px] tracking-[0.14em] text-crimson uppercase">
+                01 · REFUND STAGE (refund_stage)
+              </p>
+              <p className="text-xs leading-relaxed text-muted">
+                Work halted, delayed, or rejected? Reclaim locked Circle USDC directly back to {short(chain?.owner ?? "owner wallet")} before payout.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={!connectedIsOwner || isFinal || !hasFunds || pending}
+              onClick={refundStage}
+              className="btn-ghost mt-4 w-full border-crimson/40 text-crimson hover:border-crimson hover:bg-crimson hover:text-[#f5f4f0]"
+            >
+              Refund Stage to Owner
+            </button>
+          </div>
+
+          {/* Escape Hatch 2: override_release */}
+          <div className="flex flex-col justify-between border border-line bg-card p-5">
+            <div className="space-y-2">
+              <p className="font-mono text-[10px] tracking-[0.14em] text-ink uppercase">
+                02 · MANUAL OVERRIDE (override_release)
+              </p>
+              <p className="text-xs leading-relaxed text-muted">
+                Verified masonry via independent surveyor or AI offline? Attach a public reason string and settle with 1 yoctoNEAR.
+              </p>
+              <input
+                type="text"
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder="Reason: e.g. In-person surveyor sign-off"
+                className="field mt-2 py-2 text-xs"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={!connectedIsOwner || isFinal || !hasFunds || !overrideReason.trim() || pending}
+              onClick={overrideRelease}
+              className="btn mt-4 w-full"
+            >
+              Override &amp; Release USDC
+            </button>
+          </div>
+
+          {/* Escape Hatch 3: set_agent */}
+          <div className="flex flex-col justify-between border border-line bg-card p-5">
+            <div className="space-y-2">
+              <p className="font-mono text-[10px] tracking-[0.14em] text-ink uppercase">
+                03 · ROTATE RELAYER AGENT (set_agent)
+              </p>
+              <p className="text-xs leading-relaxed text-muted">
+                Freeze or replace the project relayer key immediately if the AI agent endpoint behaves unexpectedly.
+              </p>
+              <input
+                type="text"
+                value={newAgent}
+                onChange={(e) => setNewAgent(e.target.value)}
+                placeholder="new-agent.testnet"
+                className="field mt-2 py-2 font-mono text-xs"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={!connectedIsOwner || !projectId || !newAgent.trim() || pending}
+              onClick={rotateAgent}
+              className="btn-ghost mt-4 w-full"
+            >
+              Update Agent Account
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <StatusAlerts error={error} info={info} />
     </section>
   );
 }
@@ -574,38 +635,38 @@ export function AttestationCard({
   };
 
   return (
-    <section className="card-blueprint space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <section className="space-y-5 border border-line bg-card p-6 md:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-dashed border-ink/20 pb-4">
         <div>
-          <p className="font-mono text-[10px] tracking-[0.14em] text-[#8ea1b8] uppercase">
-            NEAR AI Cloud · Confidential TEE
+          <p className="font-mono text-[10px] tracking-[0.16em] text-vermilion uppercase">
+            NEAR AI CLOUD · HARDWARE TEE SIGNER
           </p>
-          <h2 className="mt-1 text-xl font-bold tracking-tight text-[#f4f0e8]">{model}</h2>
+          <h2 className="mt-1 font-sans text-2xl font-medium tracking-[-0.03em] text-ink">{model}</h2>
         </div>
-        <button type="button" disabled={loading} onClick={() => void checkLive()} className="btn-pop px-4 py-2 text-xs">
-          {loading ? "Checking TDX + GPU…" : "Verify live TEE attestation"}
+        <button type="button" disabled={loading} onClick={() => void checkLive()} className="btn-pop">
+          {loading ? "Checking Intel TDX + NRAS…" : "Verify Live TEE Attestation"}
         </button>
       </div>
 
       {registeredSigner && (
-        <div className="rounded-lg border border-blueprint-line bg-blueprint-card/75 p-3 font-mono text-[11px] text-[#9db0c7]">
-          <span className="block text-[10px] uppercase tracking-wider">On-chain contract signer</span>
-          <span className="mt-1 block break-all text-[#f4f0e8]">{registeredSigner}</span>
+        <div className="border border-dashed border-ink/20 bg-paper p-4 font-mono text-[11px]">
+          <span className="label block">On-Chain Registered Ed25519 Public Key</span>
+          <span className="mt-1.5 block break-all text-ink">{registeredSigner}</span>
         </div>
       )}
 
-      {err && <p className="rounded-lg bg-red-950/60 px-3 py-2 text-xs text-red-200">{err}</p>}
+      {err && <p className="border border-crimson/35 bg-crimson/10 px-4 py-3 font-mono text-xs text-crimson">{err}</p>}
 
       {report && (
-        <div className="space-y-1.5 rounded-lg border border-blueprint-line bg-[#09111c] p-3 font-mono text-[11px]">
+        <div className="space-y-2 border border-leaf/35 bg-mint/60 p-4 font-mono text-[11px]">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-semibold text-[#f4f0e8]">Intel TDX · {report.tcbStatus}</span>
-            <span className={`rounded px-2 py-0.5 ${report.matchesOnChain ? "bg-radar/20 text-mint" : "bg-pepper/20 text-pepper"}`}>
-              {report.matchesOnChain ? "Matches on-chain signer" : "Attested"}
+            <span className="font-semibold text-ink">Intel TDX · {report.tcbStatus}</span>
+            <span className="rounded-[2px] border border-leaf/35 bg-card px-2 py-0.5 text-[10px] font-semibold text-leaf uppercase">
+              {report.matchesOnChain ? "Matches On-Chain Signer" : "Attested"}
             </span>
           </div>
-          <p className="break-all text-[#9db0c7]">Signing key: {report.signingAddress}</p>
-          <p className="text-[#9db0c7]">
+          <p className="break-all text-ink">Signing Address: {report.signingAddress}</p>
+          <p className="text-muted">
             GPU NRAS: {report.gpuVerified ? "Verified" : "TDX quote verified"} · Checked{" "}
             {new Date(report.verifiedAt).toLocaleTimeString("en-GB")}
           </p>
