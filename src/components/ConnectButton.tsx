@@ -9,8 +9,16 @@ function shortAccount(id: string): string {
 
 function WalletIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="shrink-0 text-muted">
-      <rect x="2" y="5" width="20" height="14" rx="2.5" />
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      className="shrink-0 text-muted"
+    >
+      <rect x="2" y="5" width="20" height="14" rx="2" />
       <path d="M16 12h4" />
       <circle cx="16.5" cy="12" r="1" fill="currentColor" />
     </svg>
@@ -18,7 +26,7 @@ function WalletIcon() {
 }
 
 export function ConnectButton() {
-  const { accountId, ready, connect, disconnect } = useNearWallet();
+  const { accountId, connect, disconnect } = useNearWallet();
 
   if (accountId) {
     return (
@@ -26,7 +34,7 @@ export function ConnectButton() {
         type="button"
         onClick={() => void disconnect()}
         title={`Connected as ${accountId} — click to disconnect`}
-        className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-card px-3.5 py-2 font-mono text-xs font-medium text-ink transition hover:border-ink"
+        className="inline-flex cursor-pointer items-center gap-2 rounded-[3px] border border-line bg-card px-3.5 py-2 font-mono text-[10px] font-medium tracking-[0.12em] text-ink transition hover:border-ink"
       >
         <span className="size-2 rounded-full bg-leaf" />
         <WalletIcon />
@@ -39,10 +47,10 @@ export function ConnectButton() {
     <button
       type="button"
       onClick={() => void connect()}
-      className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-card px-3.5 py-2 font-mono text-xs font-medium text-ink transition hover:border-ink"
+      className="inline-flex cursor-pointer items-center gap-2 rounded-[3px] border border-line bg-card px-3.5 py-2 font-mono text-[10px] font-medium tracking-[0.12em] uppercase text-ink transition hover:border-ink"
     >
       <WalletIcon />
-      <span>{ready ? "Connect NEAR Wallet" : "Connect NEAR Wallet"}</span>
+      <span>Connect NEAR Wallet</span>
     </button>
   );
 }
