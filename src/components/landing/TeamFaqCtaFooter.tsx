@@ -158,6 +158,9 @@ export function TeamFaqCtaFooter({
                 <Link href="/build" className="btn-ghost px-6 py-3.5">
                   Inspect Live Escrow →
                 </Link>
+                <Link href="/projects" className="btn-ghost px-6 py-3.5">
+                  Completed Works →
+                </Link>
               </div>
             </div>
 
@@ -202,6 +205,9 @@ export function TeamFaqCtaFooter({
                 </li>
                 <li>
                   <Link href="/verify" className="hover:text-vermilion">(03) Ledger &amp; Public Rules</Link>
+                </li>
+                <li>
+                  <Link href="/projects" className="hover:text-vermilion">(04) Projects &amp; Monographs</Link>
                 </li>
               </ul>
             </div>

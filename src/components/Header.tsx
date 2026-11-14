@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/build", code: "(01)", label: "ESCROW" },
   { href: "/site", code: "(02)", label: "SITE CAMERA" },
   { href: "/verify", code: "(03)", label: "LEDGER & RULES" },
+  { href: "/projects", code: "(04)", label: "PROJECTS" },
 ] as const;
 
 export function Header({ wallet = true }: { wallet?: boolean }) {
@@ -153,6 +154,7 @@ export function Header({ wallet = true }: { wallet?: boolean }) {
                   { href: "/build", code: "(01)", title: "Owner Escrow", note: "USDC vault, 1 yoctoNEAR & escape hatches" },
                   { href: "/site", code: "(02)", title: "Site Camera", note: "Gasless foreman relay, geofence & TEE AI" },
                   { href: "/verify", code: "(03)", title: "Ledger & Rules", note: "Bookkeeper CSV, on-chain rules & recovery" },
+                  { href: "/projects", code: "(04)", title: "Projects Register", note: "Completed monographs & architectural dossiers" },
                 ].map((row) => (
                   <Link
                     key={row.href}
