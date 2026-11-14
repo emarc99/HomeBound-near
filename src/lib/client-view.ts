@@ -28,6 +28,7 @@ export type ClientStage = {
   laborPaidUsdCents: number;
   nearStageIndex: number | null;
   nearStatus: ChainStageStatus | null;
+  criteriaHash: string;
 };
 
 export type ClientPayment = {
@@ -47,6 +48,7 @@ export type ClientEvidence = {
   id: string;
   stageId: string;
   blobKey: string | null;
+  sha256: string | null;
   takenAt: string | null;
   lat: number | null;
   lng: number | null;
@@ -106,6 +108,7 @@ export function toClientView(v: ProjectView, near: ClientNear): ClientView {
         laborPaidUsdCents: laborPaid.reduce((a, p) => a + p.amountUsdCents, 0),
         nearStageIndex: s.nearStageIndex,
         nearStatus: s.nearStatus,
+        criteriaHash: s.criteriaHash,
       };
     }),
     payments: v.payments.map((p) => ({
@@ -124,6 +127,7 @@ export function toClientView(v: ProjectView, near: ClientNear): ClientView {
       id: e.id,
       stageId: e.stageId,
       blobKey: e.blobKey,
+      sha256: e.sha256,
       takenAt: iso(e.takenAt),
       lat: e.lat,
       lng: e.lng,

@@ -311,8 +311,12 @@ export async function pushVerdictToChain(input: {
   }
   const nearProjectId = project.nearProjectId;
   const index = stage.nearStageIndex;
-  if (input.signed.reference !== verdictReference(nearProjectId, index, input.evidenceSha256)) {
-    record.error = "The model's answer named a different stage or photo, so it can't go on chain. Upload the photo again.";
+  const criteriaHash = createHash("sha256").update(stage.acceptanceCriteria).digest("hex");
+  const expectedWithCriteria = verdictReference(nearProjectId, index, input.evidenceSha256, criteriaHash);
+  const expectedLegacy = verdictReference(nearProjectId, index, input.evidenceSha256);
+  if (input.signed.reference !== expectedWithCriteria && input.signed.reference !== expectedLegacy) {
+    record.error =
+      "The model's answer named a different stage, criteria hash, or photo, so it can't go on chain. Upload the photo again.";
     await save();
     return record;
   }

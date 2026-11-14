@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { asc, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { evidence, ledgerEvents, parties, payments, projects, stages } from "@/db/schema";
@@ -23,7 +24,10 @@ export async function getProjectView(projectId: string) {
 
   return {
     project,
-    stages: stageRows,
+    stages: stageRows.map((s) => ({
+      ...s,
+      criteriaHash: createHash("sha256").update(s.acceptanceCriteria).digest("hex"),
+    })),
     payments: paymentRows,
     evidence: evidenceRows,
     parties: partyRows,

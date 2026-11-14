@@ -79,6 +79,13 @@ export function formatUsdc(raw: string | bigint): string {
 /** The escrow's project IDs can't contain '/' and must be at most 64 characters. */
 export const chainProjectId = (projectId: string) => `hb-${projectId.replace(/-/g, "").slice(0, 16)}`;
 
-/** The string the model must echo back so a verdict can't be replayed on another stage or photo. */
-export const verdictReference = (chainProject: string, stageIndex: number, evidenceSha256: string) =>
-  `${chainProject}/${stageIndex}/${evidenceSha256}`;
+/** The string the model must echo back so a verdict binds project, stage, criteria hash, and photo. */
+export const verdictReference = (
+  chainProject: string,
+  stageIndex: number,
+  evidenceSha256: string,
+  criteriaHash?: string,
+) =>
+  criteriaHash
+    ? `${chainProject}/${stageIndex}/${criteriaHash}/${evidenceSha256}`
+    : `${chainProject}/${stageIndex}/${evidenceSha256}`;

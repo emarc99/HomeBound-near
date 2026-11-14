@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { evidence, parties, payments, projects, stages, type EvidenceVerdict, type StageStatus } from "@/db/schema";
@@ -70,13 +71,19 @@ export async function submitStagePhoto(input: { stageId: string; file: Buffer; u
       return { check: { name: CHECK.ai, status: "unavailable", detail: "NEARAI_API_KEY is not configured." }, assessment: null, model: null, signed: null };
     }
     try {
+      const criteriaHash = createHash("sha256").update(stage.acceptanceCriteria).digest("hex");
       const { assessment, model, signed } = await assessStagePhotoNearAi({
         image: jpeg,
         stageName: stage.name,
         stageDescription: stage.description,
         acceptanceCriteria: stage.acceptanceCriteria,
         siteLabel: `${project.siteCity}, ${project.siteState}, Nigeria`,
-        reference: verdictReference(project.nearProjectId ?? chainProjectId(project.id), stage.nearStageIndex ?? 0, meta.sha256),
+        reference: verdictReference(
+          project.nearProjectId ?? chainProjectId(project.id),
+          stage.nearStageIndex ?? 0,
+          meta.sha256,
+          criteriaHash,
+        ),
       });
       const met = assessment.criteria.filter((c) => c.status === "met").length;
       return {
