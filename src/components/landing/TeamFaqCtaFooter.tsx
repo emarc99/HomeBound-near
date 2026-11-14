@@ -28,60 +28,6 @@ const FAQ_ITEMS = [
   },
 ];
 
-function HalftoneStaircaseSvg() {
-  return (
-    <svg
-      viewBox="0 0 520 380"
-      className="h-auto w-full select-none"
-      role="img"
-      aria-label="Halftone architectural staircase dissolving into warm stone"
-    >
-      <defs>
-        <pattern id="stair-dots-1" width="5" height="5" patternUnits="userSpaceOnUse">
-          <circle cx="1.6" cy="1.6" r="1.25" fill="#111110" fillOpacity="0.34" />
-        </pattern>
-        <pattern id="stair-dots-2" width="6" height="6" patternUnits="userSpaceOnUse">
-          <circle cx="2" cy="2" r="1.15" fill="#111110" fillOpacity="0.18" />
-        </pattern>
-      </defs>
-
-      {[0, 1, 2, 3, 4, 5, 6].map((step) => {
-        const x = 60 + step * 52;
-        const y = 290 - step * 34;
-        const w = 420 - step * 52;
-        return (
-          <g key={step}>
-            <rect
-              x={x}
-              y={y}
-              width={w}
-              height="34"
-              fill={step % 2 === 0 ? "url(#stair-dots-1)" : "url(#stair-dots-2)"}
-              stroke="#111110"
-              strokeOpacity="0.32"
-              strokeWidth="1"
-            />
-            <line
-              x1={x}
-              y1={y}
-              x2={x + w}
-              y2={y}
-              stroke={step === 3 ? "#f04600" : "#111110"}
-              strokeWidth={step === 3 ? "1.6" : "1"}
-              strokeOpacity={step === 3 ? "0.9" : "0.45"}
-            />
-          </g>
-        );
-      })}
-
-      <text x="235" y="176" fill="#f04600" fontFamily="monospace" fontSize="10" letterSpacing="1.6">
-        STEP 03 · RELEASE GATE
-      </text>
-      <line x1="60" y1="324" x2="480" y2="324" stroke="#111110" strokeOpacity="0.25" strokeDasharray="4 4" />
-    </svg>
-  );
-}
-
 export function TeamFaqCtaFooter({
   escrowAccount,
   agentAccount,
@@ -216,9 +162,14 @@ export function TeamFaqCtaFooter({
             </div>
 
             <div className="lg:col-span-6">
-              <div className="border border-dashed border-ink/20 bg-paper p-6">
-                <HalftoneStaircaseSvg />
-              </div>
+              <Image
+                src="/art/cta-stipple-pavilion.png"
+                alt="Stipple-dithered cantilevered concrete pavilion with verified Stage 03 lintel beam"
+                width={820}
+                height={760}
+                unoptimized
+                className="h-auto w-full select-none"
+              />
             </div>
           </div>
         </CadFrame>

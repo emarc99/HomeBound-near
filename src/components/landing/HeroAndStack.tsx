@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import type { ClientStage } from "@/lib/client-view";
-import { CadFrame, HalftoneBungalowSvg, openWaitlistModal, SectionEyebrow } from "./CadPrimitives";
+import { openWaitlistModal, SectionEyebrow } from "./CadPrimitives";
 
 type StackStatus = "Paid" | "Proposed" | "Funded" | "Refunded" | "Planned";
 
@@ -98,12 +99,10 @@ function liveStackStatus(live?: ClientStage): StackStatus | null {
 }
 
 export function HeroAndStack({
-  escrowAccount,
-  network,
   stages,
 }: {
-  escrowAccount: string;
-  network: string;
+  escrowAccount?: string;
+  network?: string;
   stages?: ClientStage[];
 }) {
   const bySeq = new Map((stages ?? []).map((s) => [s.seq, s]));
@@ -126,72 +125,58 @@ export function HeroAndStack({
   return (
     <>
       {/* SECTION 01: HERO */}
-      <section className="mx-auto max-w-[1340px] px-6 pt-16 pb-24 md:px-10 md:pt-24 md:pb-32">
-        <CadFrame className="bg-card/55 p-8 md:p-14">
-          <div className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-dashed border-ink/20 pb-5">
-            <span className="font-mono text-[10px] tracking-[0.18em] text-muted uppercase">
-              AUTONOMOUS SETTLEMENT FOR PHYSICAL INFRASTRUCTURE
-            </span>
-            <span className="inline-flex items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-leaf uppercase">
-              <span className="size-2 rounded-full bg-leaf" />
-              LIVE ON NEAR {network.toUpperCase()} · {escrowAccount}
-            </span>
-          </div>
+      <section className="mx-auto max-w-[1340px] px-6 pt-14 pb-20 md:px-10 md:pt-20 md:pb-28">
+        <div className="grid items-center gap-12 lg:grid-cols-12">
+          <div className="lg:col-span-5">
+            <p className="mb-4 font-mono text-[11px] tracking-[0.18em] text-muted uppercase">
+              + AUTONOMOUS SETTLEMENT FOR PHYSICAL INFRASTRUCTURE
+            </p>
 
-          <div className="grid items-center gap-12 lg:grid-cols-12">
-            <div className="space-y-8 lg:col-span-6">
-              <h1 className="font-sans text-5xl font-medium tracking-[-0.055em] text-ink sm:text-6xl lg:text-[72px] lg:leading-[0.98]">
-                Intelligence, built to{" "}
-                <span className="inline-block rounded-[4px] bg-vermilion px-3 py-0.5 text-[#f5f4f0]">
+            <h1 className="font-sans text-5xl font-semibold tracking-[-0.05em] text-ink sm:text-6xl lg:text-[66px]">
+              <span className="block leading-[1.08]">Intelligence,</span>
+              <span className="mt-3.5 block leading-[1.08]">
+                built to{" "}
+                <span className="inline-block rounded-[5px] bg-vermilion px-3.5 py-0.5 text-[#f5f4f0]">
                   settle
                 </span>
                 .
-              </h1>
-
-              <p className="max-w-xl text-base leading-relaxed text-muted md:text-lg">
-                Homebound gives remote builders and local contractors the rails to fund, grade, and release stablecoin
-                construction tranches through attested AI; without losing visibility or control.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <button
-                  type="button"
-                  onClick={openWaitlistModal}
-                  className="btn cursor-pointer px-6 py-3.5 text-[11px]"
-                >
-                  Join Waitlist · Secure Access
-                </button>
-                <Link href="/build" className="btn-ghost px-6 py-3.5 text-[11px]">
-                  Open Live Escrow · Explore
-                </Link>
-              </div>
-            </div>
-
-            <div className="lg:col-span-6">
-              <div className="border border-dashed border-ink/25 bg-paper p-5 md:p-6">
-                <div className="mb-3 flex items-center justify-between font-mono text-[10px] tracking-[0.14em] text-muted uppercase">
-                  <span>ELEVATION · AKOBO BUNGALOW</span>
-                  <span>SHEET A-101 · SCALE 1:100</span>
-                </div>
-                <HalftoneBungalowSvg />
-              </div>
-            </div>
-          </div>
-
-          {/* ARCA Architectural Dimension Ruler */}
-          <div className="mt-12 border-t border-dashed border-ink/20 pt-5">
-            <div className="flex flex-wrap items-center justify-between gap-4 font-mono text-[10px] tracking-[0.16em] text-muted uppercase">
-              <span>|← 150 000 MM GEOFENCE RADIUS</span>
-              <span className="hidden text-ink sm:inline">
-                {stageCount} STAGES · {totalUsd} ESCROW · 1 YOCTONEAR RELEASE AUTHORITY
               </span>
-              <span>IBADAN, OYO →|</span>
+            </h1>
+
+            <p className="mt-7 max-w-xl text-base leading-relaxed text-muted md:text-lg">
+              Homebound gives remote builders and local contractors the rails to fund, grade, and release stablecoin
+              construction tranches through attested AI; without losing visibility or control.
+            </p>
+
+            <div className="mt-9 flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={openWaitlistModal}
+                className="btn cursor-pointer px-6 py-3.5 text-[11px]"
+              >
+                Join Waitlist · Secure Access
+              </button>
+              <Link href="/build" className="btn-ghost px-6 py-3.5 text-[11px]">
+                Open Live Escrow · Explore
+              </Link>
             </div>
           </div>
-        </CadFrame>
+
+          <div className="lg:col-span-7">
+            <Image
+              src="/art/hero-tee-scan-morph.png"
+              alt="Real Akobo masonry photograph morphing across a NEAR AI TEE laser scan into verified structural CAD geometry"
+              width={820}
+              height={740}
+              priority
+              unoptimized
+              className="h-auto w-full select-none"
+            />
+          </div>
+        </div>
       </section>
 
-      {/* SECTION 02: REMITTANCE STACK CARDS (6 STAGES) */}
+      {/* SECTION 02: STAGE-LOCKED REMITTANCE (EXPLODED STRUCTURAL TRANCHES + SCHEDULE) */}
       <section className="mx-auto max-w-[1340px] px-6 py-24 md:px-10">
         <div className="mb-14 flex flex-wrap items-end justify-between gap-6">
           <SectionEyebrow
@@ -204,42 +189,62 @@ export function HeroAndStack({
           </Link>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {cards.map((s) => (
-            <Link key={s.seq} href={s.href} className="group block">
-              <CadFrame className="flex h-full flex-col justify-between bg-card p-8 transition group-hover:border-ink">
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-mono text-[10px] tracking-[0.16em] text-muted uppercase">
-                      {s.seq} · {s.code}
-                    </span>
+        <div className="grid items-center gap-10 lg:grid-cols-12">
+          <div className="lg:col-span-7">
+            <Image
+              src="/art/stages-exploded-axonometric.png"
+              alt="Exploded 3-tier isometric structural cutaway of the 6-stage Akobo bungalow"
+              width={820}
+              height={790}
+              unoptimized
+              className="h-auto w-full select-none"
+            />
+          </div>
+
+          <div className="lg:col-span-5">
+            <div className="mb-4 flex items-center justify-between font-mono text-[10px] tracking-[0.16em] text-muted uppercase">
+              <span>STAGE SCHEDULE · AKOBO BUNGALOW</span>
+              <span>{stageCount} TRANCHES</span>
+            </div>
+
+            <div className="divide-y divide-dashed divide-ink/20 border-t border-b border-dashed border-ink/25">
+              {cards.map((s) => (
+                <Link
+                  key={s.seq}
+                  href={s.href}
+                  className="group flex items-center justify-between gap-4 py-4 transition hover:bg-card/55"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-mono text-[11px] font-semibold text-vermilion">{s.seq}</span>
+                      <h3 className="truncate font-sans text-base font-medium tracking-[-0.02em] text-ink transition group-hover:text-vermilion md:text-lg">
+                        {s.name}
+                      </h3>
+                    </div>
+                    <p className="font-mono text-[11px] text-muted">
+                      {s.trancheUsd} <span className="opacity-65">({s.trancheNgn} est.)</span>
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-3">
                     <span
                       className={`rounded-[2px] border px-2.5 py-1 font-mono text-[10px] font-medium tracking-[0.12em] uppercase ${badgeTone(s.status)}`}
                     >
                       {s.status}
                     </span>
+                    <span className="font-mono text-xs text-muted transition group-hover:translate-x-0.5 group-hover:text-ink">
+                      →
+                    </span>
                   </div>
+                </Link>
+              ))}
+            </div>
 
-                  <div className="space-y-2.5">
-                    <h3 className="font-sans text-2xl font-medium tracking-[-0.03em] text-ink transition group-hover:text-vermilion">
-                      {s.name}
-                    </h3>
-                    <p className="text-sm leading-relaxed text-muted">{s.spec}</p>
-                  </div>
-                </div>
-
-                <div className="mt-8 flex items-baseline justify-between border-t border-dashed border-ink/20 pt-5">
-                  <div>
-                    <p className="font-mono text-lg font-medium text-ink">{s.trancheUsd}</p>
-                    <p className="font-mono text-[11px] text-muted">{s.trancheNgn} est.</p>
-                  </div>
-                  <span className="font-mono text-[10px] tracking-[0.14em] text-muted uppercase transition group-hover:text-ink">
-                    Open →
-                  </span>
-                </div>
-              </CadFrame>
-            </Link>
-          ))}
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] tracking-[0.14em] text-muted uppercase">
+              <span>{stageCount} STAGES · {totalUsd} ESCROW</span>
+              <span className="text-ink">1 YOCTONEAR RELEASE</span>
+            </div>
+          </div>
         </div>
       </section>
     </>
